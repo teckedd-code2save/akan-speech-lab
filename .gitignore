@@ -1,0 +1,21 @@
+.DS_Store
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local datasets, checkpoints, and run artifacts
+data/raw/
+data/processed/
+data/manifests/*.jsonl
+data/manifests/*.csv
+checkpoints/
+outputs/
+wandb/
+trackio/
+evals/reports/*.json
+evals/reports/*.csv
+evals/reports/*.md
+

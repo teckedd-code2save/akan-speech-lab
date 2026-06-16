@@ -1,0 +1,24 @@
+base_model: openai/whisper-small
+baseline_model: teckedd/whisper_small-waxal_akan-asr-v1
+language: aka
+dataset_manifest: data/manifests/waxal_aka_asr_speaker_safe.jsonl
+output_dir: checkpoints/whisper-small-waxal-aka-v2
+learning_rate: 0.00001
+warmup_steps: 200
+max_steps: 3000
+train_batch_size: 16
+eval_batch_size: 8
+gradient_accumulation_steps: 2
+generation_max_length: 225
+metric_for_best_model: wer
+greater_is_better: false
+tokenizer_strategy:
+  - no_forced_language
+  - yoruba_proxy
+  - english_proxy
+promotion_gate:
+  baseline_wer_percent: 34.2849
+  minimum_relative_improvement_percent: 10
+  require_qualitative_review: true
+push_to_hub: false
+

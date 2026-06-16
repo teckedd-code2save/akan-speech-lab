@@ -1,0 +1,17 @@
+asr:
+  waxal_whisper_small_v1:
+    model_id: teckedd/whisper_small-waxal_akan-asr-v1
+    base_model: openai/whisper-small
+    dataset: google/WaxalNLP
+    config: aka_asr
+    reported_wer_percent: 34.2849
+    reported_loss: 0.4755
+    notes: >
+      User-trained baseline with surprisingly useful Akan output despite using
+      a Yoruba-adjacent tokenizer strategy. Treat as the minimum bar, not the
+      target.
+  mms_1b_all:
+    model_id: facebook/mms-1b-all
+    dataset: mixed
+    notes: Baseline for multilingual ASR behavior, especially code and language support.
+

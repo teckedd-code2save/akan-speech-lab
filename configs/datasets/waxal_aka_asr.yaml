@@ -1,0 +1,18 @@
+dataset_id: google/WaxalNLP
+config: aka_asr
+language: aka
+task: asr
+audio_column: audio
+text_column: transcription
+speaker_column: speaker_id
+target_sample_rate: 16000
+recommended_manifest: data/manifests/waxal_aka_asr_speaker_safe.jsonl
+known_baseline:
+  model_id: teckedd/whisper_small-waxal_akan-asr-v1
+  reported_wer_percent: 34.2849
+  base_model: openai/whisper-small
+notes: >
+  Primary reproduction and improvement dataset for the next ASR push. Use
+  speaker-safe manifests for honest evaluation, because public discussion
+  indicates the released ASR splits can contain speaker overlap.
+

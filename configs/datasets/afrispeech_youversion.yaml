@@ -1,0 +1,6 @@
+dataset_id: AfriSpeech/youversion-african-speech
+language: aka
+task: asr
+target_sample_rate: 16000
+notes: Candidate supplemental dataset. Must inspect licensing, language labels, speaker balance, and transcript quality before mixing.
+

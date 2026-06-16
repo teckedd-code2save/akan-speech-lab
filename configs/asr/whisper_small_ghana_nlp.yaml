@@ -1,0 +1,15 @@
+base_model: openai/whisper-small
+language: aka
+dataset_manifest: data/manifests/ghana_nlp_twi.jsonl
+output_dir: checkpoints/whisper-small-ghana-nlp-aka
+learning_rate: 0.00001
+warmup_steps: 200
+max_steps: 2000
+train_batch_size: 16
+eval_batch_size: 8
+gradient_accumulation_steps: 2
+generation_max_length: 225
+metric_for_best_model: wer
+greater_is_better: false
+push_to_hub: false
+

@@ -1,0 +1,9 @@
+dataset_id: ghananlpcommunity/twi-speech-text-multispeaker-16k
+language: aka
+task: asr
+audio_column: audio
+text_column: transcription
+speaker_column: speaker_id
+target_sample_rate: 16000
+notes: GhanaNLP Twi multispeaker speech-text dataset. First target for controlled ASR experiments.
+

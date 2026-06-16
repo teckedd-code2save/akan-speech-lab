@@ -1,0 +1,7 @@
+base_model: facebook/mms-tts-aka
+language: aka
+dataset_manifest: data/manifests/tts_akan.jsonl
+output_dir: checkpoints/mms-tts-aka-domain
+push_to_hub: false
+notes: Placeholder until TTS dataset quality and speaker consent are confirmed.
+
