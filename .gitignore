@@ -19,3 +19,4 @@ evals/reports/*.json
 evals/reports/*.jsonl
 evals/reports/*.csv
 evals/reports/*.md
+evals/samples/*.jsonl

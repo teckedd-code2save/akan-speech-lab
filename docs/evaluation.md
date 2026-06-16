@@ -27,6 +27,55 @@ Required ASR slices:
 - WER/CER by speaker frequency bucket.
 - Qualitative samples with reference, prediction, normalized reference, normalized prediction, and error notes.
 
+## Tiny Local Baseline
+
+Build a fixed preview manifest:
+
+```bash
+python scripts/build_waxal_viewer_manifest.py \
+  --config aka_asr \
+  --split test \
+  --limit 5 \
+  --output evals/samples/waxal_aka_asr_test_preview.jsonl
+```
+
+Materialize audio locally so model evaluation does not depend on streaming signed URLs:
+
+```bash
+python scripts/materialize_manifest_audio.py \
+  --manifest evals/samples/waxal_aka_asr_test_preview.jsonl \
+  --output-manifest evals/samples/waxal_aka_asr_test_preview_local.jsonl \
+  --limit 3
+```
+
+Evaluate a model on a few rows locally:
+
+```bash
+python scripts/eval_asr_manifest.py \
+  --model-id teckedd/whisper_small-waxal_akan-asr-v1 \
+  --manifest evals/samples/waxal_aka_asr_test_preview_local.jsonl \
+  --limit 2 \
+  --language yoruba \
+  --task transcribe
+```
+
+This is not the final benchmark. It is a wiring test that proves model loading, audio loading, normalization, prediction capture, and WER/CER reporting.
+
+If a model is large, cache it explicitly before evaluation:
+
+```bash
+python scripts/cache_hf_model.py \
+  --model-id teckedd/whisper_small-waxal_akan-asr-v1
+```
+
+Render a report:
+
+```bash
+python scripts/render_asr_report.py \
+  --input-json evals/reports/asr_eval_report.json \
+  --output-md evals/reports/asr_eval_report.md
+```
+
 ## TTS
 
 TTS needs a separate gate:
