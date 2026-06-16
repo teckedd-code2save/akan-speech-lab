@@ -27,6 +27,15 @@ python scripts/prepare_waxal.py \
 
 Use `--limit 1000` for a cheap local smoke pass before a full manifest build.
 
+If the full `datasets` loader is slow on first access, use Dataset Viewer metadata first:
+
+```bash
+python scripts/inspect_waxal_viewer.py \
+  --config aka_asr \
+  --split train \
+  --output evals/reports/waxal_aka_asr_viewer_preview.json
+```
+
 Inspect the manifest before training:
 
 ```bash

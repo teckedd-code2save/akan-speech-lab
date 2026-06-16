@@ -28,13 +28,22 @@ def split_from_speaker(speaker_id: str, validation_pct: int, test_pct: int) -> s
     return "train"
 
 
-def load_waxal_splits(dataset_id: str, config: str, splits: list[str], sample_rate: int):
+def load_waxal_splits(
+    dataset_id: str,
+    config: str,
+    splits: list[str],
+    sample_rate: int,
+    *,
+    streaming: bool = False,
+):
     datasets = []
     for split in splits:
-        ds = load_dataset(dataset_id, config, split=split)
+        ds = load_dataset(dataset_id, config, split=split, streaming=streaming)
         if "audio" in ds.column_names:
             ds = ds.cast_column("audio", Audio(sampling_rate=sample_rate))
         datasets.append(ds)
+    if streaming:
+        return datasets
     return concatenate_datasets(datasets) if len(datasets) > 1 else datasets[0]
 
 
@@ -65,49 +74,64 @@ def main() -> None:
     parser.add_argument("--test-pct", type=int, default=10)
     parser.add_argument("--min-duration", type=float, default=0.4)
     parser.add_argument("--max-duration", type=float, default=30.0)
+    parser.add_argument(
+        "--no-streaming",
+        action="store_true",
+        help="Materialize the dataset locally. Default streams rows, which is safer for smoke tests.",
+    )
     args = parser.parse_args()
 
-    ds = load_waxal_splits(args.dataset_id, args.config, args.splits, args.target_sample_rate)
+    datasets = load_waxal_splits(
+        args.dataset_id,
+        args.config,
+        args.splits,
+        args.target_sample_rate,
+        streaming=not args.no_streaming,
+    )
+    if not isinstance(datasets, list):
+        datasets = [datasets]
     records = []
     skipped = defaultdict(int)
     seen = 0
 
-    for idx, row in enumerate(ds):
+    for source_split, ds in zip(args.splits, datasets, strict=False):
+        for idx, row in enumerate(ds):
+            if args.limit and seen >= args.limit:
+                break
+            seen += 1
+            text = row.get("transcription") or row.get("text") or ""
+            audio = row.get("audio") or {}
+            duration = duration_from_audio(audio)
+            speaker_id = row.get("speaker_id") or f"unknown-{source_split}-{idx}"
+            language = row.get("language") or row.get("locale") or "aka"
+            if not text.strip():
+                skipped["empty_text"] += 1
+                continue
+            if duration is not None and duration < args.min_duration:
+                skipped["too_short"] += 1
+                continue
+            if duration is not None and duration > args.max_duration:
+                skipped["too_long"] += 1
+                continue
+            split = (
+                split_from_speaker(str(speaker_id), args.validation_pct, args.test_pct)
+                if args.speaker_safe_split
+                else source_split
+            )
+            audio_path = audio.get("path") or f"{args.dataset_id}:{args.config}:{source_split}:{idx}"
+            records.append(
+                make_record(
+                    audio_path=audio_path,
+                    text=text,
+                    language=language,
+                    speaker_id=speaker_id,
+                    duration_seconds=duration,
+                    split=split,
+                    source=f"{args.dataset_id}/{args.config}/{source_split}",
+                )
+            )
         if args.limit and seen >= args.limit:
             break
-        seen += 1
-        text = row.get("transcription") or row.get("text") or ""
-        audio = row.get("audio") or {}
-        duration = duration_from_audio(audio)
-        speaker_id = row.get("speaker_id") or f"unknown-{idx}"
-        language = row.get("language") or row.get("locale") or "aka"
-        source_split = row.get("split") or "waxal"
-        if not text.strip():
-            skipped["empty_text"] += 1
-            continue
-        if duration is not None and duration < args.min_duration:
-            skipped["too_short"] += 1
-            continue
-        if duration is not None and duration > args.max_duration:
-            skipped["too_long"] += 1
-            continue
-        split = (
-            split_from_speaker(str(speaker_id), args.validation_pct, args.test_pct)
-            if args.speaker_safe_split
-            else source_split
-        )
-        audio_path = audio.get("path") or f"{args.dataset_id}:{args.config}:{idx}"
-        records.append(
-            make_record(
-                audio_path=audio_path,
-                text=text,
-                language=language,
-                speaker_id=speaker_id,
-                duration_seconds=duration,
-                split=split,
-                source=f"{args.dataset_id}/{args.config}/{source_split}",
-            )
-        )
 
     count = write_jsonl(records, Path(args.output))
     split_counts = defaultdict(int)

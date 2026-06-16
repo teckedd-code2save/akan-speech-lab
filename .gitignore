@@ -16,6 +16,6 @@ outputs/
 wandb/
 trackio/
 evals/reports/*.json
+evals/reports/*.jsonl
 evals/reports/*.csv
 evals/reports/*.md
-
