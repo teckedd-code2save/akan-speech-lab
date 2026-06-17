@@ -46,12 +46,14 @@ body, .gradio-container {
 .ak-shell { max-width: 1240px; margin: 0 auto; }
 .ak-hero {
   background: var(--paper);
-  border: var(--stroke-thick) solid var(--line);
-  border-radius: var(--r-lg);
-  box-shadow: var(--plush);
-  padding: 24px;
+  border: 2px solid var(--line);
+  border-radius: 26px;
+  box-shadow: 0 5px 0 rgba(43,30,22,.75), 0 12px 24px rgba(43,30,22,.10);
+  padding: 28px 30px;
   margin: 12px 0 18px;
+  color: var(--ink) !important;
 }
+.ak-hero * { color: inherit; }
 .ak-kicker {
   font-family: 'Quicksand', sans-serif;
   font-weight: 700;
@@ -66,6 +68,7 @@ body, .gradio-container {
   margin: 6px 0 10px;
   font-weight: 900;
   letter-spacing: 0;
+  color: var(--ink) !important;
 }
 .ak-hero p { max-width: 780px; color: var(--ink-2); font-size: 17px; margin: 0; }
 .ak-chiprow { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
@@ -80,18 +83,29 @@ body, .gradio-container {
 .ak-chip.butter { background: var(--butter); }
 .ak-chip.peach { background: var(--peach); }
 
-.gradio-container .block, .gradio-container .form, .gradio-container .panel {
-  border-radius: var(--r-md) !important;
+.gradio-container h1, .gradio-container h2, .gradio-container h3,
+.gradio-container p, .gradio-container span {
+  color: var(--ink);
 }
-.gradio-container .block:not(.gradio-html) {
-  border: var(--stroke) solid var(--line) !important;
-  box-shadow: var(--plush-sm) !important;
-  background: white !important;
+.gradio-container .gradio-html,
+.gradio-container .html-container {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+.gradio-container .block,
+.gradio-container .form,
+.gradio-container .panel {
+  border-radius: var(--r-sm) !important;
+}
+.gradio-container .block {
+  box-shadow: none !important;
 }
 .gradio-container button {
-  border: var(--stroke) solid var(--line) !important;
+  border: 2px solid var(--line) !important;
   border-radius: var(--r-pill) !important;
-  box-shadow: 0 4px 0 var(--line) !important;
+  box-shadow: 0 3px 0 rgba(43,30,22,.8) !important;
   font-weight: 900 !important;
   color: var(--ink) !important;
 }
@@ -101,24 +115,56 @@ body, .gradio-container {
 .gradio-container button:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--line) !important; }
 
 .gradio-container input, .gradio-container textarea, .gradio-container select {
-  border: 2.5px solid var(--line) !important;
-  border-radius: var(--r-sm) !important;
+  border: 1.5px solid #8E7261 !important;
+  border-radius: 12px !important;
   background: var(--cream-2) !important;
   color: var(--ink) !important;
+  box-shadow: none !important;
 }
 .gradio-container label, .gradio-container .label-wrap span {
   color: var(--ink) !important;
   font-weight: 800 !important;
 }
-.ak-card {
-  background: white;
-  border: var(--stroke) solid var(--line);
-  border-radius: var(--r-md);
-  box-shadow: var(--plush-sm);
-  padding: 16px;
+.gradio-container .wrap,
+.gradio-container .container,
+.gradio-container .form {
+  background: white !important;
+  border-color: rgba(43,30,22,.22) !important;
 }
+.gradio-container .tab-nav {
+  border-bottom: 1px solid rgba(43,30,22,.28) !important;
+  gap: 6px !important;
+}
+.gradio-container button[role="tab"] {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  padding: 10px 14px !important;
+}
+.gradio-container button[role="tab"][aria-selected="true"] {
+  color: var(--ink) !important;
+  border-bottom: 4px solid var(--peach-deep) !important;
+}
+.ak-card {
+  background: var(--paper);
+  border: 1.5px solid rgba(43,30,22,.55);
+  border-radius: 18px;
+  box-shadow: 0 4px 12px rgba(43,30,22,.08);
+  padding: 18px 20px;
+  color: var(--ink) !important;
+}
+.ak-card * { color: inherit; }
 .ak-status { font-weight: 900; font-size: 18px; margin-bottom: 6px; }
 .ak-muted { color: var(--ink-2); }
+
+footer { color: var(--ink-2) !important; }
+footer button,
+.gradio-container .reset-button {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
 """
 
 
