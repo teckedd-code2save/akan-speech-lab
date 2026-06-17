@@ -731,7 +731,16 @@ def build_app() -> gr.Blocks:
                     )
                     with gr.Row():
                         eval_limit = gr.Slider(1, 5, value=1, step=1, label="Rows to evaluate")
-                        language = gr.Dropdown(["yoruba", "english", ""], value="yoruba", label="Whisper language hint")
+                        language = gr.Dropdown(
+                            choices=[
+                                ("No forced language", ""),
+                                ("Yoruba proxy", "yoruba"),
+                                ("English proxy", "english"),
+                            ],
+                            value="",
+                            label="Decoder strategy",
+                            info="Run the same fixed rows under each strategy before choosing one.",
+                        )
                     with gr.Row():
                         dry_btn = gr.Button("Dry-run eval", variant="secondary")
                         cache_btn = gr.Button("Cache model", variant="secondary")

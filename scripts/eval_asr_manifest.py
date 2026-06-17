@@ -100,6 +100,7 @@ def main() -> None:
         prediction = transcribe(pipe, row["audio_path"], generate_kwargs)
         predictions.append(prediction)
         references.append(reference)
+        row_metrics = speech_error_rates([reference], [prediction])
         result_rows.append(
             {
                 "idx": idx,
@@ -109,6 +110,7 @@ def main() -> None:
                 "prediction": prediction,
                 "normalized_reference": normalize_akan_text(reference),
                 "normalized_prediction": normalize_akan_text(prediction),
+                **row_metrics,
             }
         )
         print(json.dumps(result_rows[-1], ensure_ascii=False), flush=True)
@@ -120,6 +122,7 @@ def main() -> None:
         "rows": len(rows),
         "device": str(device),
         "generate_kwargs": generate_kwargs,
+        "decoder_strategy": args.language or "no_forced_language",
         "runtime_seconds": round(perf_counter() - started, 3),
         **metrics,
     }
