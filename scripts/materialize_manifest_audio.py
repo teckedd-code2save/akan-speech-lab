@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import urllib.request
 from pathlib import Path
@@ -13,6 +14,12 @@ def extension_from_url(url: str) -> str:
     path = urlparse(url).path
     suffix = Path(path).suffix
     return suffix if suffix else ".mp3"
+
+
+def audio_filename(index: int, url: str) -> str:
+    """Keep cached audio aligned with its manifest row across split changes."""
+    digest = hashlib.sha256(url.encode("utf-8")).hexdigest()[:12]
+    return f"sample_{index:04d}_{digest}{extension_from_url(url)}"
 
 
 def main() -> None:
@@ -33,7 +40,7 @@ def main() -> None:
     for idx, row in enumerate(rows):
         source = row["audio_path"]
         if source.startswith("http://") or source.startswith("https://"):
-            output_path = audio_dir / f"sample_{idx:04d}{extension_from_url(source)}"
+            output_path = audio_dir / audio_filename(idx, source)
             if not output_path.exists():
                 print(f"Downloading {idx + 1}/{len(rows)} -> {output_path}")
                 urllib.request.urlretrieve(source, output_path)
@@ -52,4 +59,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
