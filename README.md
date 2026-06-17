@@ -39,6 +39,25 @@ python scripts/smoke_test.py
 pytest
 ```
 
+## Local UI
+
+Run the Gradio control console:
+
+```bash
+python app.py
+```
+
+Open `http://127.0.0.1:7862`.
+
+The UI can:
+
+- build a fixed Waxal Akan sample pack,
+- download the sample audio locally,
+- dry-run model evaluation,
+- cache a Hugging Face ASR model,
+- run a small ASR eval,
+- render WER/CER reports.
+
 ## Cost Rule
 
 Default workflow is local and CPU-safe. Modal GPU jobs should only run after:
