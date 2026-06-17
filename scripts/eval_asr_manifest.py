@@ -106,6 +106,7 @@ def main() -> None:
                 "idx": idx,
                 "speaker_id": row.get("speaker_id"),
                 "source": row.get("source"),
+                "audio_path": row.get("audio_path"),
                 "reference": reference,
                 "prediction": prediction,
                 "normalized_reference": normalize_akan_text(reference),

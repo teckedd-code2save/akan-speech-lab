@@ -596,6 +596,83 @@ def load_report(path: str):
     return report.read_text(encoding="utf-8")
 
 
+def eval_json_choices() -> gr.Dropdown:
+    REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+    files = []
+    for path in REPORTS_DIR.glob("*_eval_*row.json"):
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if payload.get("predictions"):
+            files.append(path)
+    files.sort(key=lambda path: path.stat().st_mtime, reverse=True)
+    choices = [(path.stem.replace("__", "/"), str(path.relative_to(ROOT))) for path in files]
+    return gr.Dropdown(choices=choices, value=choices[0][1] if choices else None)
+
+
+def resolve_eval_audio(payload: dict, row: dict) -> str | None:
+    candidate = row.get("audio_path")
+    if not candidate:
+        manifest_path = ROOT / str(payload.get("report", {}).get("manifest") or "")
+        manifest_rows = read_manifest_rows(manifest_path)
+        index = int(row.get("idx", 0))
+        if index < len(manifest_rows):
+            candidate = manifest_rows[index].get("audio_path")
+    if not candidate:
+        return None
+    path = Path(str(candidate))
+    if not path.is_absolute():
+        path = ROOT / path
+    return str(path) if path.exists() else None
+
+
+def load_eval_row(report_path: str, row_index: str | int):
+    if not report_path:
+        return None, "", "", "_Choose an evaluation report._"
+    path = ROOT / report_path
+    if not path.exists():
+        return None, "", "", "_Evaluation report not found._"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    rows = payload.get("predictions", [])
+    if not rows:
+        return None, "", "", "_This report has no saved predictions._"
+    try:
+        index = max(0, min(int(row_index), len(rows) - 1))
+    except (TypeError, ValueError):
+        index = 0
+    row = rows[index]
+    if "wer" not in row:
+        from akan_speech.eval.wer import speech_error_rates
+
+        row.update(speech_error_rates([row.get("reference", "")], [row.get("prediction", "")]))
+    metrics = (
+        f"**Row {index + 1} of {len(rows)} · speaker {row.get('speaker_id') or 'unknown'}**  \n"
+        f"WER **{float(row.get('wer', 0)) * 100:.2f}%** · CER **{float(row.get('cer', 0)) * 100:.2f}%** · "
+        f"{row.get('substitutions', 0)} substitutions · {row.get('deletions', 0)} deletions · "
+        f"{row.get('insertions', 0)} insertions"
+    )
+    return (
+        resolve_eval_audio(payload, row),
+        row.get("reference", ""),
+        row.get("prediction", ""),
+        metrics,
+    )
+
+
+def load_eval_inspector(report_path: str):
+    if not report_path or not (ROOT / report_path).exists():
+        return gr.Dropdown(choices=[], value=None), None, "", "", "_Choose an evaluation report._"
+    payload = json.loads((ROOT / report_path).read_text(encoding="utf-8"))
+    rows = payload.get("predictions", [])
+    choices = [
+        (f"Row {idx + 1} · speaker {row.get('speaker_id') or 'unknown'}", str(idx))
+        for idx, row in enumerate(rows)
+    ]
+    audio, reference, prediction, metrics = load_eval_row(report_path, "0")
+    return gr.Dropdown(choices=choices, value="0" if choices else None), audio, reference, prediction, metrics
+
+
 def app_summary() -> str:
     has_pack = LOCAL_MANIFEST.exists()
     report_count = len(list(REPORTS_DIR.glob("*.md"))) if REPORTS_DIR.exists() else 0
@@ -760,6 +837,59 @@ def build_app() -> gr.Blocks:
                         inputs=[model_id, eval_limit, language],
                         outputs=[eval_status, eval_logs, eval_report, eval_report_file],
                     ).then(app_summary, outputs=state)
+
+                    gr.Markdown(
+                        "## Listen row by row\nPlay the original utterance, then compare the saved reference and model prediction. Browser read-aloud is only an accessibility aid; its Akan pronunciation is not part of the ASR evaluation."
+                    )
+                    with gr.Row():
+                        listen_report = eval_json_choices()
+                        refresh_listen = gr.Button("Refresh evaluations", variant="secondary")
+                    listen_row = gr.Dropdown(label="Evaluation row", choices=[])
+                    listen_metrics = gr.Markdown("_Choose an evaluation report._")
+                    original_audio = gr.Audio(label="Original utterance", type="filepath", interactive=False)
+                    with gr.Row():
+                        with gr.Column():
+                            reference_text = gr.Textbox(label="Reference", lines=6, interactive=False)
+                            read_reference = gr.Button("Read reference aloud", variant="secondary")
+                        with gr.Column():
+                            prediction_text = gr.Textbox(label="Prediction", lines=6, interactive=False)
+                            read_prediction = gr.Button("Read prediction aloud", variant="secondary")
+                    listen_report.change(
+                        load_eval_inspector,
+                        inputs=listen_report,
+                        outputs=[listen_row, original_audio, reference_text, prediction_text, listen_metrics],
+                    )
+                    listen_row.change(
+                        load_eval_row,
+                        inputs=[listen_report, listen_row],
+                        outputs=[original_audio, reference_text, prediction_text, listen_metrics],
+                    )
+                    refresh_listen.click(eval_json_choices, outputs=listen_report)
+                    read_reference.click(
+                        fn=None,
+                        inputs=reference_text,
+                        js="""(text) => {
+                            window.speechSynthesis.cancel();
+                            const utterance = new SpeechSynthesisUtterance(text || '');
+                            utterance.lang = 'ak-GH';
+                            window.speechSynthesis.speak(utterance);
+                        }""",
+                    )
+                    read_prediction.click(
+                        fn=None,
+                        inputs=prediction_text,
+                        js="""(text) => {
+                            window.speechSynthesis.cancel();
+                            const utterance = new SpeechSynthesisUtterance(text || '');
+                            utterance.lang = 'ak-GH';
+                            window.speechSynthesis.speak(utterance);
+                        }""",
+                    )
+                    demo.load(
+                        load_eval_inspector,
+                        inputs=listen_report,
+                        outputs=[listen_row, original_audio, reference_text, prediction_text, listen_metrics],
+                    )
 
                 with gr.Tab("3 · Train"):
                     gr.HTML(training_plan())
