@@ -40,4 +40,13 @@ modal volume get akan-speech-checkpoints \
   outputs/modal/summary.json
 ```
 
+Evaluate a persisted candidate directly, without publishing it to the Hub:
+
+```bash
+modal run modal_jobs/asr_eval.py \
+  --model-id /checkpoints/<run-name>/checkpoint-<step> \
+  --strategies yoruba,no_forced_language \
+  --output evals/reports/<run-name>-checkpoint-<step>.json
+```
+
 After a run, verify that `modal app list` shows no active `akan-speech-asr-train` task. Volumes persist; GPU containers do not.

@@ -8,10 +8,12 @@ import modal
 
 HOUR = 60 * 60
 CACHE_DIR = "/cache"
+CHECKPOINT_DIR = "/checkpoints"
 OUTPUT_DIR = "/outputs"
 
 app = modal.App("akan-speech-asr-eval")
 cache_volume = modal.Volume.from_name("akan-speech-hf-cache", create_if_missing=True)
+checkpoint_volume = modal.Volume.from_name("akan-speech-checkpoints", create_if_missing=True)
 output_volume = modal.Volume.from_name("akan-speech-eval-results", create_if_missing=True)
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -67,7 +69,11 @@ def error_rates(references: list[str], predictions: list[str]) -> dict:
     gpu="L4",
     cpu=4,
     memory=16384,
-    volumes={CACHE_DIR: cache_volume, OUTPUT_DIR: output_volume},
+    volumes={
+        CACHE_DIR: cache_volume,
+        CHECKPOINT_DIR: checkpoint_volume,
+        OUTPUT_DIR: output_volume,
+    },
     secrets=[modal.Secret.from_name("huggingface-token", required_keys=["HF_TOKEN"])],
     timeout=2 * HOUR,
     scaledown_window=30,
