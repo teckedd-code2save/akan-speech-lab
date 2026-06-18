@@ -229,6 +229,7 @@ def train_asr(config_dict: dict) -> dict:
         WhisperForConditionalGeneration,
         WhisperProcessor,
         WhisperTokenizer,
+        TrainerCallback,
         set_seed,
     )
 
@@ -282,6 +283,11 @@ def train_asr(config_dict: dict) -> dict:
         normalized_labels = [normalize_akan_text(text) for text in label_text]
         return {"wer": wer(normalized_labels, normalized_predictions)}
 
+    class CommitCheckpointCallback(TrainerCallback):
+        def on_save(self, args, state, control, **kwargs):
+            output_volume.commit()
+            return control
+
     training_args = Seq2SeqTrainingArguments(
         output_dir=str(run_dir),
         run_name=config.run_name,
@@ -318,6 +324,7 @@ def train_asr(config_dict: dict) -> dict:
         processing_class=feature_extractor,
         data_collator=collator,
         compute_metrics=compute_metrics,
+        callbacks=[CommitCheckpointCallback()],
     )
     baseline_metrics = trainer.evaluate(metric_key_prefix="baseline")
     trainer.save_metrics("baseline", baseline_metrics)
