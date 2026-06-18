@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import json
 import os
 import subprocess
@@ -18,6 +19,10 @@ ENV = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
 PREVIEW_MANIFEST = ROOT / "evals/samples/waxal_aka_asr_test_preview.jsonl"
 LOCAL_MANIFEST = ROOT / "evals/samples/waxal_aka_asr_test_preview_local.jsonl"
 REPORTS_DIR = ROOT / "evals/reports"
+TTS_COMPARISON_DIR = ROOT / "outputs/tts_comparisons"
+TTS_MODEL_ID = "facebook/mms-tts-aka"
+_TTS_MODEL = None
+_TTS_TOKENIZER = None
 
 
 CSS = """
@@ -673,6 +678,53 @@ def load_eval_inspector(report_path: str):
     return gr.Dropdown(choices=choices, value="0" if choices else None), audio, reference, prediction, metrics
 
 
+def _load_akan_tts():
+    global _TTS_MODEL, _TTS_TOKENIZER
+    if _TTS_MODEL is None or _TTS_TOKENIZER is None:
+        from transformers import AutoTokenizer, VitsModel
+
+        _TTS_TOKENIZER = AutoTokenizer.from_pretrained(TTS_MODEL_ID)
+        _TTS_MODEL = VitsModel.from_pretrained(TTS_MODEL_ID)
+        _TTS_MODEL.eval()
+    return _TTS_MODEL, _TTS_TOKENIZER
+
+
+def synthesize_akan_text(text: str, role: str) -> str:
+    if not (text or "").strip():
+        raise ValueError(f"The {role} text is empty.")
+    import soundfile as sf
+    import torch
+
+    model, tokenizer = _load_akan_tts()
+    cache_key = hashlib.sha256(f"{TTS_MODEL_ID}\n{text}".encode("utf-8")).hexdigest()[:20]
+    TTS_COMPARISON_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = TTS_COMPARISON_DIR / f"{role}_{cache_key}.wav"
+    if not output_path.exists():
+        inputs = tokenizer(text, return_tensors="pt")
+        torch.manual_seed(42)
+        with torch.no_grad():
+            waveform = model(**inputs).waveform.squeeze().cpu().float().numpy()
+        sf.write(output_path, waveform, model.config.sampling_rate)
+    return str(output_path)
+
+
+def synthesize_eval_pair(reference: str, prediction: str):
+    try:
+        reference_audio = synthesize_akan_text(reference, "reference")
+        prediction_audio = synthesize_akan_text(prediction, "prediction")
+    except Exception as exc:
+        return None, None, status_html(False, "Akan TTS comparison", str(exc))
+    return (
+        reference_audio,
+        prediction_audio,
+        status_html(
+            True,
+            "Akan TTS comparison",
+            f"Both WAVs generated with {TTS_MODEL_ID}. Compare pronunciation differences, not speaker identity.",
+        ),
+    )
+
+
 def app_summary() -> str:
     has_pack = LOCAL_MANIFEST.exists()
     report_count = len(list(REPORTS_DIR.glob("*.md"))) if REPORTS_DIR.exists() else 0
@@ -839,7 +891,7 @@ def build_app() -> gr.Blocks:
                     ).then(app_summary, outputs=state)
 
                     gr.Markdown(
-                        "## Listen row by row\nPlay the original utterance, then compare the saved reference and model prediction. Browser read-aloud is only an accessibility aid; its Akan pronunciation is not part of the ASR evaluation."
+                        "## Listen row by row\nPlay the original recording, then generate the reference and prediction with the same Akan TTS model. This makes text differences audible without changing the ASR score."
                     )
                     with gr.Row():
                         listen_report = eval_json_choices()
@@ -850,40 +902,33 @@ def build_app() -> gr.Blocks:
                     with gr.Row():
                         with gr.Column():
                             reference_text = gr.Textbox(label="Reference", lines=6, interactive=False)
-                            read_reference = gr.Button("Read reference aloud", variant="secondary")
+                            reference_audio = gr.Audio(label="Synthesized reference", type="filepath", interactive=False)
                         with gr.Column():
                             prediction_text = gr.Textbox(label="Prediction", lines=6, interactive=False)
-                            read_prediction = gr.Button("Read prediction aloud", variant="secondary")
+                            prediction_audio = gr.Audio(label="Synthesized prediction", type="filepath", interactive=False)
+                    synthesize_pair = gr.Button("Generate both Akan audios", variant="primary")
+                    synthesis_status = gr.HTML()
                     listen_report.change(
                         load_eval_inspector,
                         inputs=listen_report,
                         outputs=[listen_row, original_audio, reference_text, prediction_text, listen_metrics],
+                    ).then(
+                        lambda: (None, None, ""),
+                        outputs=[reference_audio, prediction_audio, synthesis_status],
                     )
                     listen_row.change(
                         load_eval_row,
                         inputs=[listen_report, listen_row],
                         outputs=[original_audio, reference_text, prediction_text, listen_metrics],
+                    ).then(
+                        lambda: (None, None, ""),
+                        outputs=[reference_audio, prediction_audio, synthesis_status],
                     )
                     refresh_listen.click(eval_json_choices, outputs=listen_report)
-                    read_reference.click(
-                        fn=None,
-                        inputs=reference_text,
-                        js="""(text) => {
-                            window.speechSynthesis.cancel();
-                            const utterance = new SpeechSynthesisUtterance(text || '');
-                            utterance.lang = 'ak-GH';
-                            window.speechSynthesis.speak(utterance);
-                        }""",
-                    )
-                    read_prediction.click(
-                        fn=None,
-                        inputs=prediction_text,
-                        js="""(text) => {
-                            window.speechSynthesis.cancel();
-                            const utterance = new SpeechSynthesisUtterance(text || '');
-                            utterance.lang = 'ak-GH';
-                            window.speechSynthesis.speak(utterance);
-                        }""",
+                    synthesize_pair.click(
+                        synthesize_eval_pair,
+                        inputs=[reference_text, prediction_text],
+                        outputs=[reference_audio, prediction_audio, synthesis_status],
                     )
                     demo.load(
                         load_eval_inspector,
