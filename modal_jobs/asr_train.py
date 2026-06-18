@@ -96,11 +96,27 @@ def prepared_dataset_path(config: TrainConfig) -> Path:
     )
 
 
+def waxal_parquet_urls(split: str) -> list[str]:
+    root = (
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/"
+        "refs%2Fconvert%2Fparquet/aka_asr"
+    )
+    shard_count = 6 if split == "train" else 1
+    return [f"{root}/{split}/{index:04d}.parquet" for index in range(shard_count)]
+
+
 def prepare_dataset(config: TrainConfig, feature_extractor, tokenizer):
     from datasets import Audio, Dataset, DatasetDict, load_dataset
 
     def load_split(split: str, limit: int):
         if not limit:
+            if config.dataset_id == "google/WaxalNLP" and config.dataset_config == "aka_asr":
+                return load_dataset(
+                    "parquet",
+                    data_files=waxal_parquet_urls(split),
+                    split="train",
+                    cache_dir=CACHE_DIR,
+                )
             return load_dataset(
                 config.dataset_id, config.dataset_config, split=split, cache_dir=CACHE_DIR
             )
