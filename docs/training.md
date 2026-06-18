@@ -34,6 +34,7 @@ The published checkpoint stores Yoruba in its generation config, but clearing it
 - Training: full model, FP16, non-reentrant gradient checkpointing
 - Optimizer schedule: AdamW defaults, `1e-5`, 200 warmup steps, 1,200 total steps
 - Effective batch: 32 (`8 x 4` accumulation)
+- Validation batch: 8 on L4
 - Selection: lowest validation WER every 200 steps
 - Test discipline: benchmark v1 is never used for training or checkpoint selection
 - Promotion gate: beat 33.62% benchmark WER and pass manual Ghanaian review

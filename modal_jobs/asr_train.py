@@ -47,7 +47,7 @@ class TrainConfig:
     learning_rate: float = 1e-5
     warmup_steps: int = 200
     train_batch_size: int = 8
-    eval_batch_size: int = 4
+    eval_batch_size: int = 8
     gradient_accumulation_steps: int = 4
     eval_steps: int = 200
     save_steps: int = 200
