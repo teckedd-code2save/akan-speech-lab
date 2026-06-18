@@ -1,0 +1,604 @@
+{
+  "dataset": "google/WaxalNLP",
+  "config": "aka_asr",
+  "split": "test",
+  "seed": 20260618,
+  "per_speaker": 3,
+  "selection": [
+    {
+      "benchmark_index": 0,
+      "dataset_row": 1064,
+      "sample_id": "ak_gh_image_0692_u776_1_1682087773709_13923",
+      "speaker_id": "5169"
+    },
+    {
+      "benchmark_index": 1,
+      "dataset_row": 1074,
+      "sample_id": "ak_gh_image_0246_u772_1_1682093858283_15290",
+      "speaker_id": "5171"
+    },
+    {
+      "benchmark_index": 2,
+      "dataset_row": 831,
+      "sample_id": "ak_gh_image_0349_u813_1_1682111887929_11739",
+      "speaker_id": "5199"
+    },
+    {
+      "benchmark_index": 3,
+      "dataset_row": 1279,
+      "sample_id": "ak_gh_image_0073_u187_1_1679939731601_16596",
+      "speaker_id": "4430"
+    },
+    {
+      "benchmark_index": 4,
+      "dataset_row": 27,
+      "sample_id": "ak_gh_image_0553_u192_1_1680800201090_02396",
+      "speaker_id": "4993"
+    },
+    {
+      "benchmark_index": 5,
+      "dataset_row": 677,
+      "sample_id": "ak_gh_image_0569_u1154_1_1682594929584_08984",
+      "speaker_id": "5707"
+    },
+    {
+      "benchmark_index": 6,
+      "dataset_row": 515,
+      "sample_id": "ak_gh_image_0455_u1047_1_1683720459343_04802",
+      "speaker_id": "6380"
+    },
+    {
+      "benchmark_index": 7,
+      "dataset_row": 1427,
+      "sample_id": "ak_gh_image_0550_u1256_1_1682498636075_17252",
+      "speaker_id": "5526"
+    },
+    {
+      "benchmark_index": 8,
+      "dataset_row": 525,
+      "sample_id": "ak_gh_image_0031_u81_1_1688734278030_06412",
+      "speaker_id": "78"
+    },
+    {
+      "benchmark_index": 9,
+      "dataset_row": 1320,
+      "sample_id": "ak_gh_image_0190_u725_1_1682098671842_18424",
+      "speaker_id": "5137"
+    },
+    {
+      "benchmark_index": 10,
+      "dataset_row": 1164,
+      "sample_id": "ak_gh_image_0792_u1374_1_1682465781179_14400",
+      "speaker_id": "5676"
+    },
+    {
+      "benchmark_index": 11,
+      "dataset_row": 783,
+      "sample_id": "ak_gh_image_0111_u187_1_1679940335329_10488",
+      "speaker_id": "4430"
+    },
+    {
+      "benchmark_index": 12,
+      "dataset_row": 384,
+      "sample_id": "ak_gh_image_0837_u1181_1_1682459772699_05989",
+      "speaker_id": "5486"
+    },
+    {
+      "benchmark_index": 13,
+      "dataset_row": 132,
+      "sample_id": "ak_gh_image_0965_u1048_1_1682447821162_01797",
+      "speaker_id": "5384"
+    },
+    {
+      "benchmark_index": 14,
+      "dataset_row": 352,
+      "sample_id": "ak_gh_image_0615_u776_1_1682165029193_05830",
+      "speaker_id": "5169"
+    },
+    {
+      "benchmark_index": 15,
+      "dataset_row": 1502,
+      "sample_id": "ak_gh_image_0249_u1219_1_1683466766809_18433",
+      "speaker_id": "6227"
+    },
+    {
+      "benchmark_index": 16,
+      "dataset_row": 1029,
+      "sample_id": "ak_gh_image_0948_u81_1_1688930260741_13728",
+      "speaker_id": "78"
+    },
+    {
+      "benchmark_index": 17,
+      "dataset_row": 583,
+      "sample_id": "ak_gh_image_0746_u816_1_1682112102216_09012",
+      "speaker_id": "5226"
+    },
+    {
+      "benchmark_index": 18,
+      "dataset_row": 1093,
+      "sample_id": "ak_gh_image_0063_u806_1_1682110341680_14493",
+      "speaker_id": "5184"
+    },
+    {
+      "benchmark_index": 19,
+      "dataset_row": 1119,
+      "sample_id": "ak_gh_image_0761_u745_3_1682127440028_13977",
+      "speaker_id": "5247"
+    },
+    {
+      "benchmark_index": 20,
+      "dataset_row": 1378,
+      "sample_id": "ak_gh_image_0617_u771_3_1682179102822_18298",
+      "speaker_id": "5294"
+    },
+    {
+      "benchmark_index": 21,
+      "dataset_row": 1238,
+      "sample_id": "ak_gh_image_0647_u1734_1_1683313112599_15140",
+      "speaker_id": "6081"
+    },
+    {
+      "benchmark_index": 22,
+      "dataset_row": 717,
+      "sample_id": "ak_gh_image_0510_u1243_1_1683239108297_08239",
+      "speaker_id": "5833"
+    },
+    {
+      "benchmark_index": 23,
+      "dataset_row": 1338,
+      "sample_id": "ak_gh_image_0882_u813_1_1682111600209_17306",
+      "speaker_id": "5199"
+    },
+    {
+      "benchmark_index": 24,
+      "dataset_row": 1321,
+      "sample_id": "ak_gh_image_0068_u725_1_1682099442358_17355",
+      "speaker_id": "5137"
+    },
+    {
+      "benchmark_index": 25,
+      "dataset_row": 60,
+      "sample_id": "ak_gh_image_0364_u816_1_1682110563220_02256",
+      "speaker_id": "5226"
+    },
+    {
+      "benchmark_index": 26,
+      "dataset_row": 1234,
+      "sample_id": "ak_gh_image_0981_u1734_1_1683312030219_14007",
+      "speaker_id": "6081"
+    },
+    {
+      "benchmark_index": 27,
+      "dataset_row": 315,
+      "sample_id": "ak_gh_image_0496_u777_1_1682112750169_05232",
+      "speaker_id": "5187"
+    },
+    {
+      "benchmark_index": 28,
+      "dataset_row": 792,
+      "sample_id": "ak_gh_image_0269_u122_1_1680086112140_11067",
+      "speaker_id": "4708"
+    },
+    {
+      "benchmark_index": 29,
+      "dataset_row": 652,
+      "sample_id": "ak_gh_image_0726_u1181_1_1682457639905_08049",
+      "speaker_id": "5486"
+    },
+    {
+      "benchmark_index": 30,
+      "dataset_row": 538,
+      "sample_id": "ak_gh_image_0388_u122_1_1680083270410_09297",
+      "speaker_id": "4708"
+    },
+    {
+      "benchmark_index": 31,
+      "dataset_row": 963,
+      "sample_id": "ak_gh_image_1012_u1563_1_1683052856982_11836",
+      "speaker_id": "5915"
+    },
+    {
+      "benchmark_index": 32,
+      "dataset_row": 757,
+      "sample_id": "ak_gh_image_1023_u1671_1_1683542919417_08422",
+      "speaker_id": "6027"
+    },
+    {
+      "benchmark_index": 33,
+      "dataset_row": 77,
+      "sample_id": "ak_gh_image_0329_u777_1_1682143036264_02978",
+      "speaker_id": "5187"
+    },
+    {
+      "benchmark_index": 34,
+      "dataset_row": 1355,
+      "sample_id": "ak_gh_image_0481_u771_2_1682122689131_18194",
+      "speaker_id": "5243"
+    },
+    {
+      "benchmark_index": 35,
+      "dataset_row": 1121,
+      "sample_id": "ak_gh_image_0456_u745_4_1682130443405_14719",
+      "speaker_id": "5247"
+    },
+    {
+      "benchmark_index": 36,
+      "dataset_row": 1480,
+      "sample_id": "ak_gh_image_0064_u1608_1_1683133958261_17819",
+      "speaker_id": "5922"
+    },
+    {
+      "benchmark_index": 37,
+      "dataset_row": 1153,
+      "sample_id": "ak_gh_image_0133_u1256_1_1682426448985_13808",
+      "speaker_id": "5526"
+    },
+    {
+      "benchmark_index": 38,
+      "dataset_row": 505,
+      "sample_id": "ak_gh_image_1026_u1661_1_1683502111046_05605",
+      "speaker_id": "6023"
+    },
+    {
+      "benchmark_index": 39,
+      "dataset_row": 835,
+      "sample_id": "ak_gh_image_0282_u777_1_1682112717081_11532",
+      "speaker_id": "5187"
+    },
+    {
+      "benchmark_index": 40,
+      "dataset_row": 1402,
+      "sample_id": "ak_gh_image_0607_u1048_3_1682449226977_18486",
+      "speaker_id": "5384"
+    },
+    {
+      "benchmark_index": 41,
+      "dataset_row": 957,
+      "sample_id": "ak_gh_image_0975_u1093_1_1683011531598_11803",
+      "speaker_id": "5594"
+    },
+    {
+      "benchmark_index": 42,
+      "dataset_row": 917,
+      "sample_id": "ak_gh_image_0104_u1256_1_1682493685647_12230",
+      "speaker_id": "5526"
+    },
+    {
+      "benchmark_index": 43,
+      "dataset_row": 623,
+      "sample_id": "ak_gh_image_0711_u772_1_1682163877927_08296",
+      "speaker_id": "5171"
+    },
+    {
+      "benchmark_index": 44,
+      "dataset_row": 1120,
+      "sample_id": "ak_gh_image_0911_u745_3_1682128088465_14823",
+      "speaker_id": "5247"
+    },
+    {
+      "benchmark_index": 45,
+      "dataset_row": 915,
+      "sample_id": "ak_gh_image_0925_u1186_1_1682469043155_10028",
+      "speaker_id": "5691"
+    },
+    {
+      "benchmark_index": 46,
+      "dataset_row": 953,
+      "sample_id": "ak_gh_image_0939_u1154_1_1682936454781_12029",
+      "speaker_id": "5707"
+    },
+    {
+      "benchmark_index": 47,
+      "dataset_row": 105,
+      "sample_id": "ak_gh_image_0661_u771_3_1682177810491_01308",
+      "speaker_id": "5294"
+    },
+    {
+      "benchmark_index": 48,
+      "dataset_row": 830,
+      "sample_id": "ak_gh_image_0961_u813_1_1682111711513_11291",
+      "speaker_id": "5199"
+    },
+    {
+      "benchmark_index": 49,
+      "dataset_row": 273,
+      "sample_id": "ak_gh_image_0142_u192_1_1680026209160_04345",
+      "speaker_id": "4993"
+    },
+    {
+      "benchmark_index": 50,
+      "dataset_row": 69,
+      "sample_id": "ak_gh_image_0107_u699_1_1682115602069_02186",
+      "speaker_id": "5136"
+    },
+    {
+      "benchmark_index": 51,
+      "dataset_row": 1229,
+      "sample_id": "ak_gh_image_0649_u1734_1_1683310498572_15479",
+      "speaker_id": "6081"
+    },
+    {
+      "benchmark_index": 52,
+      "dataset_row": 186,
+      "sample_id": "ak_gh_image_0417_u1563_1_1683029987655_01895",
+      "speaker_id": "5915"
+    },
+    {
+      "benchmark_index": 53,
+      "dataset_row": 983,
+      "sample_id": "ak_gh_image_0156_u1684_1_1683356821086_10747",
+      "speaker_id": "6040"
+    },
+    {
+      "benchmark_index": 54,
+      "dataset_row": 337,
+      "sample_id": "ak_gh_image_0184_u806_1_1682147176002_05589",
+      "speaker_id": "5184"
+    },
+    {
+      "benchmark_index": 55,
+      "dataset_row": 371,
+      "sample_id": "ak_gh_image_0810_u885_1_1682259553079_04504",
+      "speaker_id": "5283"
+    },
+    {
+      "benchmark_index": 56,
+      "dataset_row": 1252,
+      "sample_id": "ak_gh_image_0635_u1661_1_1683500229800_14930",
+      "speaker_id": "6023"
+    },
+    {
+      "benchmark_index": 57,
+      "dataset_row": 1508,
+      "sample_id": "ak_gh_image_0576_u1671_1_1683538681208_17116",
+      "speaker_id": "6027"
+    },
+    {
+      "benchmark_index": 58,
+      "dataset_row": 570,
+      "sample_id": "ak_gh_image_0373_u816_1_1682108326148_08589",
+      "speaker_id": "5226"
+    },
+    {
+      "benchmark_index": 59,
+      "dataset_row": 370,
+      "sample_id": "ak_gh_image_0026_u885_1_1682257789011_05155",
+      "speaker_id": "5283"
+    },
+    {
+      "benchmark_index": 60,
+      "dataset_row": 1277,
+      "sample_id": "ak_gh_image_0127_u187_1_1679941651598_16863",
+      "speaker_id": "4430"
+    },
+    {
+      "benchmark_index": 61,
+      "dataset_row": 844,
+      "sample_id": "ak_gh_image_0240_u699_1_1682116426772_11829",
+      "speaker_id": "5136"
+    },
+    {
+      "benchmark_index": 62,
+      "dataset_row": 1382,
+      "sample_id": "ak_gh_image_0423_u885_1_1682200052285_16929",
+      "speaker_id": "5283"
+    },
+    {
+      "benchmark_index": 63,
+      "dataset_row": 381,
+      "sample_id": "ak_gh_image_0192_u1181_1_1682456496288_04543",
+      "speaker_id": "5486"
+    },
+    {
+      "benchmark_index": 64,
+      "dataset_row": 726,
+      "sample_id": "ak_gh_image_0293_u1684_1_1683356352973_08369",
+      "speaker_id": "6040"
+    },
+    {
+      "benchmark_index": 65,
+      "dataset_row": 1212,
+      "sample_id": "ak_gh_image_0201_u1149_1_1683010136264_15086",
+      "speaker_id": "5667"
+    },
+    {
+      "benchmark_index": 66,
+      "dataset_row": 689,
+      "sample_id": "ak_gh_image_0930_u1093_1_1682919156204_08496",
+      "speaker_id": "5594"
+    },
+    {
+      "benchmark_index": 67,
+      "dataset_row": 995,
+      "sample_id": "ak_gh_image_0032_u1219_1_1683466435110_11910",
+      "speaker_id": "6227"
+    },
+    {
+      "benchmark_index": 68,
+      "dataset_row": 1306,
+      "sample_id": "ak_gh_image_0246_u776_1_1682087397545_18455",
+      "speaker_id": "5169"
+    },
+    {
+      "benchmark_index": 69,
+      "dataset_row": 290,
+      "sample_id": "ak_gh_image_0856_u772_1_1682100043246_04938",
+      "speaker_id": "5171"
+    },
+    {
+      "benchmark_index": 70,
+      "dataset_row": 396,
+      "sample_id": "ak_gh_image_0636_u1374_1_1682466448068_05107",
+      "speaker_id": "5676"
+    },
+    {
+      "benchmark_index": 71,
+      "dataset_row": 1099,
+      "sample_id": "ak_gh_image_0253_u806_1_1682110546665_14688",
+      "speaker_id": "5184"
+    },
+    {
+      "benchmark_index": 72,
+      "dataset_row": 750,
+      "sample_id": "ak_gh_image_0358_u1661_1_1683501708781_07928",
+      "speaker_id": "6023"
+    },
+    {
+      "benchmark_index": 73,
+      "dataset_row": 546,
+      "sample_id": "ak_gh_image_0950_u192_1_1680800654218_08730",
+      "speaker_id": "4993"
+    },
+    {
+      "benchmark_index": 74,
+      "dataset_row": 1441,
+      "sample_id": "ak_gh_image_0869_u1243_1_1682657556741_18340",
+      "speaker_id": "5833"
+    },
+    {
+      "benchmark_index": 75,
+      "dataset_row": 1262,
+      "sample_id": "ak_gh_image_0400_u1671_1_1683557661711_14921",
+      "speaker_id": "6027"
+    },
+    {
+      "benchmark_index": 76,
+      "dataset_row": 662,
+      "sample_id": "ak_gh_image_0652_u1374_1_1682465572781_09139",
+      "speaker_id": "5676"
+    },
+    {
+      "benchmark_index": 77,
+      "dataset_row": 1076,
+      "sample_id": "ak_gh_image_0995_u725_1_1682099786080_15215",
+      "speaker_id": "5137"
+    },
+    {
+      "benchmark_index": 78,
+      "dataset_row": 73,
+      "sample_id": "ak_gh_image_0957_u771_2_1682121619130_02894",
+      "speaker_id": "5243"
+    },
+    {
+      "benchmark_index": 79,
+      "dataset_row": 1150,
+      "sample_id": "ak_gh_image_0205_u1048_1_1682376414048_15264",
+      "speaker_id": "5384"
+    },
+    {
+      "benchmark_index": 80,
+      "dataset_row": 773,
+      "sample_id": "ak_gh_image_0300_u1047_1_1683732922883_08774",
+      "speaker_id": "6380"
+    },
+    {
+      "benchmark_index": 81,
+      "dataset_row": 467,
+      "sample_id": "ak_gh_image_0544_u1608_1_1683133126280_04310",
+      "speaker_id": "5922"
+    },
+    {
+      "benchmark_index": 82,
+      "dataset_row": 210,
+      "sample_id": "ak_gh_image_0403_u1608_1_1683311614727_01891",
+      "speaker_id": "5922"
+    },
+    {
+      "benchmark_index": 83,
+      "dataset_row": 937,
+      "sample_id": "ak_gh_image_0388_u1093_1_1682763785856_12461",
+      "speaker_id": "5594"
+    },
+    {
+      "benchmark_index": 84,
+      "dataset_row": 220,
+      "sample_id": "ak_gh_image_1009_u1219_1_1683432873195_02406",
+      "speaker_id": "6227"
+    },
+    {
+      "benchmark_index": 85,
+      "dataset_row": 239,
+      "sample_id": "ak_gh_image_0217_u1047_1_1683720154873_01558",
+      "speaker_id": "6380"
+    },
+    {
+      "benchmark_index": 86,
+      "dataset_row": 1303,
+      "sample_id": "ak_gh_image_0695_u699_1_1682073738122_17534",
+      "speaker_id": "5136"
+    },
+    {
+      "benchmark_index": 87,
+      "dataset_row": 522,
+      "sample_id": "ak_gh_image_0019_u81_1_1688730863688_06383",
+      "speaker_id": "78"
+    },
+    {
+      "benchmark_index": 88,
+      "dataset_row": 153,
+      "sample_id": "ak_gh_image_0214_u1154_1_1682498323720_01859",
+      "speaker_id": "5707"
+    },
+    {
+      "benchmark_index": 89,
+      "dataset_row": 1285,
+      "sample_id": "ak_gh_image_0189_u122_1_1680081135881_17678",
+      "speaker_id": "4708"
+    },
+    {
+      "benchmark_index": 90,
+      "dataset_row": 1198,
+      "sample_id": "ak_gh_image_0794_u1186_1_1682889691808_15165",
+      "speaker_id": "5691"
+    },
+    {
+      "benchmark_index": 91,
+      "dataset_row": 1465,
+      "sample_id": "ak_gh_image_0630_u1149_1_1682972247888_18093",
+      "speaker_id": "5667"
+    },
+    {
+      "benchmark_index": 92,
+      "dataset_row": 872,
+      "sample_id": "ak_gh_image_0298_u771_3_1682178734449_11731",
+      "speaker_id": "5294"
+    },
+    {
+      "benchmark_index": 93,
+      "dataset_row": 852,
+      "sample_id": "ak_gh_image_0240_u771_2_1682119436794_11830",
+      "speaker_id": "5243"
+    },
+    {
+      "benchmark_index": 94,
+      "dataset_row": 409,
+      "sample_id": "ak_gh_image_0678_u1149_1_1682586978112_06265",
+      "speaker_id": "5667"
+    },
+    {
+      "benchmark_index": 95,
+      "dataset_row": 735,
+      "sample_id": "ak_gh_image_0529_u1684_1_1683444559787_08242",
+      "speaker_id": "6040"
+    },
+    {
+      "benchmark_index": 96,
+      "dataset_row": 706,
+      "sample_id": "ak_gh_image_0622_u1563_1_1683052828092_08424",
+      "speaker_id": "5915"
+    },
+    {
+      "benchmark_index": 97,
+      "dataset_row": 1484,
+      "sample_id": "ak_gh_image_0576_u1243_1_1683238813997_17115",
+      "speaker_id": "5833"
+    },
+    {
+      "benchmark_index": 98,
+      "dataset_row": 171,
+      "sample_id": "ak_gh_image_0188_u1186_1_1682887758711_01546",
+      "speaker_id": "5691"
+    }
+  ],
+  "selection_sha256": "26cb4503aafba65f9f141e95401be81389071c067d9849888ce9356c0a57e938"
+}

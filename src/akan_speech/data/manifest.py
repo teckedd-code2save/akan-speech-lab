@@ -19,6 +19,8 @@ class SpeechRecord:
     split: str = "train"
     source: str = ""
     dataset_row: int | None = None
+    sample_id: str | None = None
+    gender: str | None = None
 
     def to_json(self) -> dict:
         return {
@@ -31,6 +33,8 @@ class SpeechRecord:
             "split": self.split,
             "source": self.source,
             "dataset_row": self.dataset_row,
+            "sample_id": self.sample_id,
+            "gender": self.gender,
         }
 
 
@@ -44,6 +48,8 @@ def make_record(
     split: str = "train",
     source: str = "",
     dataset_row: int | None = None,
+    sample_id: str | None = None,
+    gender: str | None = None,
 ) -> SpeechRecord:
     return SpeechRecord(
         audio_path=audio_path,
@@ -55,6 +61,8 @@ def make_record(
         split=split,
         source=source,
         dataset_row=dataset_row,
+        sample_id=sample_id,
+        gender=gender,
     )
 
 

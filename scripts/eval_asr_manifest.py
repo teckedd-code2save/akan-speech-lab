@@ -11,6 +11,8 @@ import torch
 
 from akan_speech.data.manifest import read_jsonl
 from akan_speech.data.normalize import normalize_akan_text
+from akan_speech.eval.breakdown import grouped_error_rates
+from akan_speech.eval.tokenization import tokenizer_fragmentation
 from akan_speech.eval.wer import speech_error_rates
 
 
@@ -30,6 +32,7 @@ def main() -> None:
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
     parser.add_argument("--language", default="")
     parser.add_argument("--task", default="transcribe")
+    parser.add_argument("--batch-size", type=int, default=1)
     parser.add_argument("--output-json", default="evals/reports/asr_eval_report.json")
     parser.add_argument("--output-csv", default="evals/reports/asr_eval_predictions.csv")
     parser.add_argument("--dry-run", action="store_true", help="Validate manifest and print rows without loading a model.")
@@ -81,7 +84,7 @@ def main() -> None:
         return
 
     started = perf_counter()
-    from transformers import pipeline
+    from transformers import AutoTokenizer, pipeline
 
     print(f"Loading model: {args.model_id}", flush=True)
     pipe = pipeline(
@@ -94,10 +97,19 @@ def main() -> None:
     predictions = []
     references = []
     result_rows = []
-    for idx, row in enumerate(rows):
-        print(f"Transcribing {idx + 1}/{len(rows)}: {row.get('audio_path')}", flush=True)
+    audio_paths = [row["audio_path"] for row in rows]
+    inference_kwargs = {"generate_kwargs": generate_kwargs} if generate_kwargs else {}
+    raw_outputs = pipe(audio_paths, batch_size=args.batch_size, **inference_kwargs)
+    if isinstance(raw_outputs, dict):
+        raw_outputs = [raw_outputs]
+    for idx, (row, raw_output) in enumerate(zip(rows, raw_outputs, strict=True)):
+        print(f"Collecting {idx + 1}/{len(rows)}: {row.get('audio_path')}", flush=True)
         reference = row.get("text") or row.get("normalized_text") or ""
-        prediction = transcribe(pipe, row["audio_path"], generate_kwargs)
+        prediction = (
+            str(raw_output.get("text") or "").strip()
+            if isinstance(raw_output, dict)
+            else str(raw_output).strip()
+        )
         predictions.append(prediction)
         references.append(reference)
         row_metrics = speech_error_rates([reference], [prediction])
@@ -107,6 +119,8 @@ def main() -> None:
                 "speaker_id": row.get("speaker_id"),
                 "source": row.get("source"),
                 "audio_path": row.get("audio_path"),
+                "dataset_row": row.get("dataset_row"),
+                "duration_seconds": row.get("duration_seconds"),
                 "reference": reference,
                 "prediction": prediction,
                 "normalized_reference": normalize_akan_text(reference),
@@ -117,6 +131,7 @@ def main() -> None:
         print(json.dumps(result_rows[-1], ensure_ascii=False), flush=True)
 
     metrics = speech_error_rates(references, predictions)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_id)
     report = {
         "model_id": args.model_id,
         "manifest": args.manifest,
@@ -125,6 +140,10 @@ def main() -> None:
         "generate_kwargs": generate_kwargs,
         "decoder_strategy": args.language or "no_forced_language",
         "runtime_seconds": round(perf_counter() - started, 3),
+        "batch_size": args.batch_size,
+        "by_speaker": grouped_error_rates(result_rows, "speaker_id"),
+        "by_duration": grouped_error_rates(result_rows, "duration_bucket"),
+        "tokenizer_fragmentation": tokenizer_fragmentation(tokenizer, references),
         **metrics,
     }
 

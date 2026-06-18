@@ -8,16 +8,24 @@ Primary metrics:
 - CER for diacritic and spelling sensitivity.
 - Qualitative examples by domain: health, ecommerce, family care, everyday speech.
 
+Frozen benchmark:
+
+- `evals/waxal_aka_benchmark_v1.json`
+- 99 utterances, exactly 3 per each of 33 test-only speakers
+- 0.5457 hours, 15.48-28.70 seconds per utterance
+- no train/validation speaker overlap and no duplicate audio hashes
+
 Baseline comparisons:
 
-- Existing Waxal Whisper fine-tune: `teckedd/whisper_small-waxal_akan-asr-v1`, reported WER `34.2849`.
+- Existing Waxal Whisper fine-tune: `teckedd/whisper_small-waxal_akan-asr-v1`, measured at 33.62% WER / 12.37% CER on benchmark v1.
 - MMS ASR.
 - New GhanaNLP-only run.
 
 Promotion rule:
 
 - Do not push a new “best” model unless it improves held-out WER and gives clearly better qualitative Akan output without regressions.
-- First target is not to reproduce `34.2849`; it is to beat it materially with a cleaner Waxal Akan split.
+- First target is below 33.62% corpus WER on benchmark v1, with a practical target of 30.26% or lower for a 10% relative gain.
+- Compare candidates with paired outputs and bootstrap intervals; do not promote on a tiny preview.
 
 Required ASR slices:
 

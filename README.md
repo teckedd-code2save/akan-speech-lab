@@ -6,7 +6,7 @@ The goal is commercial-grade speech infrastructure for domains such as health, e
 
 ## Initial Roadmap
 
-1. Build clean dataset manifests for Waxal Akan ASR and GhanaNLP Twi speech-text.
+1. Audit Waxal Akan ASR and freeze a reproducible, speaker-balanced benchmark.
 2. Normalize Akan text consistently and inspect data quality before training.
 3. Evaluate existing baselines:
    - `teckedd/whisper_small-waxal_akan-asr-v1`
@@ -69,7 +69,7 @@ Default workflow is local and CPU-safe. Modal GPU jobs should only run after:
 
 ## Current ASR Baseline
 
-The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`, trained on Waxal Akan ASR with reported WER `34.2849`. The target is materially better than this through better preprocessing, evaluation, and training discipline.
+The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`. On this repo's frozen 99-row, 33-speaker Waxal benchmark it scores **33.62% WER / 12.37% CER** with a 30.91%-36.79% bootstrap WER interval. No forced language and the checkpoint's stored Yoruba prompt produce identical predictions; English prompting is invalid for this model. The first candidate therefore uses no forced language token.
 
 ## Key Docs
 
@@ -77,5 +77,6 @@ The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`, trained on 
 - [Preprocessing strategy](docs/preprocessing.md)
 - [Experiment plan](docs/experiments.md)
 - [Evaluation protocol](docs/evaluation.md)
+- [Frozen benchmark](docs/benchmark.md)
 - [Modal usage](docs/modal.md)
 - [Old Waxal notebook findings](docs/old_waxal_notebook_findings.md)

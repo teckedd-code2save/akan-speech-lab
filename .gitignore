@@ -5,6 +5,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .ruff_cache/
+*.egg-info/
 
 # Local datasets, checkpoints, and run artifacts
 data/raw/

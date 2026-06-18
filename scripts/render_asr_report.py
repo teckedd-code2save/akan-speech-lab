@@ -57,6 +57,27 @@ def main() -> None:
         )
     lines.extend([
         "",
+        "## Breakdown",
+        "",
+        "### Duration buckets",
+        "",
+        "| Bucket | Rows | WER | CER |",
+        "|---|---:|---:|---:|",
+    ])
+    for bucket, metrics in report.get("by_duration", {}).items():
+        lines.append(
+            f"| `{bucket}` | {metrics.get('rows', 0)} | {float(metrics.get('wer', 0)) * 100:.2f}% | "
+            f"{float(metrics.get('cer', 0)) * 100:.2f}% |"
+        )
+    tokenization = report.get("tokenizer_fragmentation", {})
+    lines.extend([
+        "",
+        "### Tokenizer fragmentation",
+        "",
+        f"- Tokens per word: `{tokenization.get('tokens_per_word', 'not measured')}`",
+        f"- Characters per token: `{tokenization.get('characters_per_token', 'not measured')}`",
+        f"- Word occurrences split into 3+ tokens: `{tokenization.get('words_split_into_3plus_tokens', 'not measured')}`",
+        "",
         "## Predictions",
         "",
     ])

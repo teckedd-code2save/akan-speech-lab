@@ -42,6 +42,8 @@ def manifest_quality_report(records: list[dict[str, Any]]) -> dict[str, Any]:
     speakers_by_split: dict[str, set[str]] = defaultdict(set)
     empty_text = 0
     missing_audio = 0
+    audio_hashes = Counter()
+    durations = []
 
     for row in records:
         split = row.get("split", "train")
@@ -51,6 +53,10 @@ def manifest_quality_report(records: list[dict[str, Any]]) -> dict[str, Any]:
             empty_text += 1
         if not str(row.get("audio_path") or "").strip():
             missing_audio += 1
+        if row.get("audio_sha256"):
+            audio_hashes[str(row["audio_sha256"])] += 1
+        if row.get("duration_seconds") is not None:
+            durations.append(float(row["duration_seconds"]))
 
     overlap = {}
     for left, right in combinations(sorted(speakers_by_split), 2):
@@ -69,6 +75,10 @@ def manifest_quality_report(records: list[dict[str, Any]]) -> dict[str, Any]:
         "speaker_overlap": overlap,
         "empty_text": empty_text,
         "missing_audio": missing_audio,
+        "measured_duration_rows": len(durations),
+        "total_audio_hours": round(sum(durations) / 3600, 4),
+        "minimum_duration_seconds": round(min(durations), 4) if durations else None,
+        "maximum_duration_seconds": round(max(durations), 4) if durations else None,
+        "duplicate_audio_hash_groups": sum(1 for count in audio_hashes.values() if count > 1),
         "valid": bool(records) and empty_text == 0 and missing_audio == 0,
     }
-

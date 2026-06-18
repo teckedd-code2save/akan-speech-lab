@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import csv
 import hashlib
 import json
 import os
@@ -20,6 +19,11 @@ ENV = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
 PREVIEW_MANIFEST = ROOT / "evals/samples/waxal_aka_asr_test_preview.jsonl"
 LOCAL_MANIFEST = ROOT / "evals/samples/waxal_aka_asr_test_preview_local.jsonl"
 REPORTS_DIR = ROOT / "evals/reports"
+BENCHMARK_INDEX = ROOT / "evals/waxal_aka_benchmark_v1.json"
+CORPUS_AUDIT = REPORTS_DIR / "waxal_aka_corpus_audit.json"
+DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
+SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
+SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
 TTS_COMPARISON_DIR = ROOT / "outputs/tts_comparisons"
 TTS_MODEL_ID = "facebook/mms-tts-aka"
 _TTS_MODEL = None
@@ -763,26 +767,81 @@ def app_summary() -> str:
       <div class="ak-chiprow">
         <span class="ak-chip {'mint' if has_pack else 'butter'}">sample pack {'ready' if has_pack else 'not built'}</span>
         <span class="ak-chip sky">{report_count} rendered report(s)</span>
-        <span class="ak-chip peach">Modal paused</span>
+        <span class="ak-chip peach">Modal scales to zero</span>
       </div>
     </div>
     """
 
 
 def training_plan() -> str:
-    manifest_ready = LOCAL_MANIFEST.exists() and bool(read_manifest_rows(LOCAL_MANIFEST))
+    benchmark_ready = BENCHMARK_INDEX.exists()
+    audit_ready = CORPUS_AUDIT.exists()
+    decoder_ready = DECODER_ANALYSIS.exists()
+    smoke_ready = SMOKE_SUMMARY.exists()
     return f"""
 <div class="ak-card">
-  <div class="ak-status">Training is gated</div>
-  <div class="ak-muted">The preview pack is not training data. Before Modal can launch, we still need a full Waxal manifest, duration measurements, filtering, and speaker-overlap checks.</div>
+  <div class="ak-status">Waxal training gate</div>
+  <div class="ak-muted">The benchmark is frozen and excluded from training. A two-step smoke run must finish before the full L4 run is enabled.</div>
   <div class="ak-chiprow">
-    <span class="ak-chip {'mint' if manifest_ready else 'butter'}">preview {'ready' if manifest_ready else 'needed'}</span>
-    <span class="ak-chip butter">full manifest pending</span>
-    <span class="ak-chip butter">speaker-safe split pending</span>
-    <span class="ak-chip peach">Modal launch locked</span>
+    <span class="ak-chip {'mint' if audit_ready else 'butter'}">corpus audit {'ready' if audit_ready else 'needed'}</span>
+    <span class="ak-chip {'mint' if benchmark_ready else 'butter'}">99-row benchmark {'frozen' if benchmark_ready else 'needed'}</span>
+    <span class="ak-chip {'mint' if decoder_ready else 'butter'}">decoder {'selected' if decoder_ready else 'needed'}</span>
+    <span class="ak-chip {'mint' if smoke_ready else 'peach'}">smoke {'passed' if smoke_ready else 'pending'}</span>
   </div>
 </div>
 """
+
+
+def benchmark_board() -> str:
+    if not DECODER_ANALYSIS.exists():
+        return "_Run the frozen benchmark before selecting a decoder strategy._"
+    analysis = json.loads(DECODER_ANALYSIS.read_text(encoding="utf-8"))
+    strategy = analysis["strategies"][analysis["selected_strategy"]]
+    metrics = strategy["metrics"]
+    interval = strategy["wer_95_percent_interval"]
+    return f"""
+### Frozen benchmark v1
+
+**99 utterances · 33 held-out speakers · 0 speaker overlap · 0 duplicate audio**
+
+| Baseline | Decoder | WER | CER | 95% WER interval |
+|---|---|---:|---:|---:|
+| `teckedd/whisper_small-waxal_akan-asr-v1` | No forced language | {metrics['wer'] * 100:.2f}% | {metrics['cer'] * 100:.2f}% | {interval['low'] * 100:.2f}%–{interval['high'] * 100:.2f}% |
+
+No forced language and the stored Yoruba prompt produced identical outputs. English prompting failed badly, so the clean candidate uses no forced language token.
+"""
+
+
+def sync_smoke_status():
+    SMOKE_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
+    ok, logs = run_command(
+        [
+            "modal",
+            "volume",
+            "get",
+            "akan-speech-checkpoints",
+            f"{SMOKE_RUN_NAME}/summary.json",
+            str(SMOKE_SUMMARY),
+        ],
+        timeout=60,
+    )
+    if not ok or not SMOKE_SUMMARY.exists():
+        return training_plan(), status_html(False, "Smoke run", "No completed summary yet."), logs
+    summary = json.loads(SMOKE_SUMMARY.read_text(encoding="utf-8"))
+    baseline = float(summary.get("baseline_metrics", {}).get("baseline_wer", 0)) * 100
+    final = float(summary.get("final_metrics", {}).get("final_wer", 0)) * 100
+    body = f"2 steps completed on {summary.get('cuda', 'Modal GPU')}. Validation WER moved {baseline:.2f}% → {final:.2f}%. This proves wiring only; it is not model evidence."
+    return training_plan(), status_html(True, "Smoke run passed", body), logs
+
+
+def launch_smoke_training():
+    ok, logs = run_command(
+        ["modal", "run", "modal_jobs/asr_train.py", "--smoke"], timeout=1800
+    )
+    plan, status, sync_logs = sync_smoke_status()
+    if not ok:
+        status = status_html(False, "Smoke run failed", "Inspect the technical log before any full run.")
+    return plan, status, logs + "\n\n" + sync_logs
 
 
 def comparison_board() -> str:
@@ -989,22 +1048,41 @@ def build_app() -> gr.Blocks:
                     )
 
                 with gr.Tab("3 · Train"):
-                    gr.HTML(training_plan())
+                    train_gate = gr.HTML(training_plan())
+                    gr.Markdown(benchmark_board())
                     gr.Markdown(
                         """
-                        ### Candidate matrix
+                        ### First candidate
 
-                        | Experiment | What changes | Why |
-                        |---|---|---|
-                        | No forced language | Remove the Yoruba decoder prompt | Test whether the proxy is constraining Akan output |
-                        | Yoruba proxy | Reproduce the old strategy | Controlled comparison with the published baseline |
-                        | English proxy | Preserve code-switched English more naturally | Waxal contains English terms and names |
-                        | Data-cleaned best | Best decoder strategy + filtered speaker-safe data | Measure the value of preprocessing separately |
+                        | Setting | Choice |
+                        |---|---|
+                        | Base | `openai/whisper-small` |
+                        | Decoder | No forced language |
+                        | Training | Full-model, 1,200 steps, best checkpoint by validation WER |
+                        | Data | Waxal `aka_asr` train + validation only |
+                        | Promotion | Beat 33.62% frozen-benchmark WER and pass Ghanaian review |
 
-                        **Required before launch:** full manifest, audio durations, empty/duplicate filtering, speaker-overlap report, fixed held-out evaluation set, and a Modal cost estimate.
+                        The smoke run uses 32 train rows, 16 validation rows, and two optimizer steps. It validates the pipeline; it cannot promote a model.
                         """
                     )
-                    gr.Button("Launch Modal training (locked)", interactive=False)
+                    with gr.Row():
+                        smoke_btn = gr.Button("Run 2-step Modal smoke", variant="primary")
+                        smoke_refresh = gr.Button("Refresh smoke status", variant="secondary")
+                    smoke_status = gr.HTML()
+                    with gr.Accordion("Technical log", open=False):
+                        smoke_logs = gr.Textbox(label="Modal log", lines=10, interactive=False)
+                    gr.Button(
+                        "Full run unlocks after smoke + CPU data preparation",
+                        interactive=False,
+                    )
+                    smoke_btn.click(
+                        launch_smoke_training,
+                        outputs=[train_gate, smoke_status, smoke_logs],
+                    )
+                    smoke_refresh.click(
+                        sync_smoke_status,
+                        outputs=[train_gate, smoke_status, smoke_logs],
+                    )
 
                 with gr.Tab("4 · Compare"):
                     compare_board = gr.Markdown(comparison_board())
