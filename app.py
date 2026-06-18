@@ -1052,17 +1052,14 @@ def build_app() -> gr.Blocks:
                     gr.Markdown(benchmark_board())
                     gr.Markdown(
                         """
-                        ### First candidate
+                        ### Candidate sequence
 
-                        | Setting | Choice |
-                        |---|---|
-                        | Base | `openai/whisper-small` |
-                        | Decoder | No forced language |
-                        | Training | Full-model, 1,200 steps, best checkpoint by validation WER |
-                        | Data | Waxal `aka_asr` train + validation only |
-                        | Promotion | Beat 33.62% frozen-benchmark WER and pass Ghanaian review |
+                        | Arm | Configuration | Result |
+                        |---|---|---|
+                        | From base | No language prefix, raw labels | Stopped at step 200: 88.88% validation WER |
+                        | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Next controlled run |
 
-                        The smoke run uses 32 train rows, 16 validation rows, and two optimizer steps. It validates the pipeline; it cannot promote a model.
+                        The failed arm is retained as evidence: inference decoder behavior did not transfer to from-base training. Promotion still requires beating 33.62% on the frozen test benchmark and passing Ghanaian review.
                         """
                     )
                     with gr.Row():
@@ -1072,7 +1069,7 @@ def build_app() -> gr.Blocks:
                     with gr.Accordion("Technical log", open=False):
                         smoke_logs = gr.Textbox(label="Modal log", lines=10, interactive=False)
                     gr.Button(
-                        "Full run unlocks after smoke + CPU data preparation",
+                        "Promotion stays locked until benchmark evaluation",
                         interactive=False,
                     )
                     smoke_btn.click(

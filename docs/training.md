@@ -28,13 +28,27 @@ Whisper does not officially target Akan as a first-class language token. We shou
 
 The published checkpoint stores Yoruba in its generation config, but clearing it produces identical benchmark predictions. The first clean candidate therefore uses no forced language token. Current references average 2.60 Whisper tokens per word; tokenizer extension remains a later controlled experiment because changing vocabulary and training policy simultaneously would hide which change helped.
 
-## Candidate v2
+## Candidate Results
+
+### Arm A: From base, no language prefix
 
 - Base: `openai/whisper-small`
+- Labels: raw Waxal transcripts
+- Decoder: no forced language
+- Step 200 validation WER: 88.88%
+- Decision: stopped; the trajectory was far behind the published run
+
+This is evidence that clearing a trained checkpoint's inference prefix is not equivalent to training Whisper from base without a language prefix.
+
+### Arm B: Continued Yoruba-prefix training
+
+- Base: `teckedd/whisper_small-waxal_akan-asr-v1`
+- Labels: conservative lowercase/punctuation normalization matching the successful notebook
+- Decoder during training: Yoruba proxy; inference is separately tested with the prefix cleared
 - Training: full model, FP16, non-reentrant gradient checkpointing
-- Optimizer schedule: AdamW defaults, `1e-5`, 200 warmup steps, 1,200 total steps
+- Optimizer schedule: AdamW defaults, `5e-6`, 50 warmup steps, 400 continuation steps
 - Effective batch: 32 (`8 x 4` accumulation)
 - Validation batch: 8 on L4
-- Selection: lowest validation WER every 200 steps
+- Selection: lowest validation WER every 100 steps
 - Test discipline: benchmark v1 is never used for training or checkpoint selection
 - Promotion gate: beat 33.62% benchmark WER and pass manual Ghanaian review

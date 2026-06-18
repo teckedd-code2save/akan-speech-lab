@@ -55,6 +55,7 @@ class TrainConfig:
     train_limit: int = 0
     eval_limit: int = 0
     seed: int = 42
+    normalize_labels: bool = False
 
 
 def normalize_akan_text(text: str) -> str:
@@ -91,8 +92,9 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 
 def prepared_dataset_path(config: TrainConfig) -> Path:
     model_name = config.base_model.rsplit("/", 1)[-1]
+    label_style = "clean" if config.normalize_labels else "raw"
     return Path(CACHE_DIR) / "prepared" / (
-        f"{config.dataset_config}-{model_name}-{config.decoder_strategy}-v1"
+        f"{config.dataset_config}-{model_name}-{config.decoder_strategy}-{label_style}-v1"
     )
 
 
@@ -148,7 +150,12 @@ def prepare_dataset(config: TrainConfig, feature_extractor, tokenizer):
         row["input_features"] = extracted.input_features[0]
         row["attention_mask"] = extracted.attention_mask[0]
         row["input_length"] = len(audio["array"])
-        row["labels"] = tokenizer(row["transcription"]).input_ids
+        text = (
+            normalize_akan_text(row["transcription"])
+            if config.normalize_labels
+            else row["transcription"]
+        )
+        row["labels"] = tokenizer(text).input_ids
         return row
 
     dataset = dataset.map(
@@ -254,8 +261,6 @@ def train_asr(config_dict: dict) -> dict:
         None if config.decoder_strategy == "no_forced_language" else config.decoder_strategy
     )
     model.generation_config.task = "transcribe"
-    model.config.suppress_tokens = []
-    model.generation_config.suppress_tokens = []
     model.config.use_cache = False
 
     if config.train_limit or config.eval_limit:
@@ -352,10 +357,27 @@ def train_asr(config_dict: dict) -> dict:
 
 
 @app.local_entrypoint()
-def main(smoke: bool = False, max_steps: int = 1200, decoder_strategy: str = "no_forced_language"):
+def main(
+    smoke: bool = False,
+    max_steps: int = 1200,
+    decoder_strategy: str = "no_forced_language",
+    arm: str = "from_base",
+):
     if decoder_strategy not in {"no_forced_language", "yoruba", "english"}:
         raise ValueError("decoder_strategy must be no_forced_language, yoruba, or english")
     config = TrainConfig(max_steps=max_steps, decoder_strategy=decoder_strategy)
+    if arm == "continue_yoruba":
+        config.run_name = "whisper-small-waxal-aka-continued-yoruba-v1"
+        config.base_model = "teckedd/whisper_small-waxal_akan-asr-v1"
+        config.decoder_strategy = "yoruba"
+        config.max_steps = 400
+        config.learning_rate = 5e-6
+        config.warmup_steps = 50
+        config.eval_steps = 100
+        config.save_steps = 100
+        config.normalize_labels = True
+    elif arm != "from_base":
+        raise ValueError("arm must be from_base or continue_yoruba")
     if smoke:
         config.run_name = "smoke-whisper-small-waxal-aka-no-language-v5"
         config.max_steps = 2
