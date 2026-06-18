@@ -18,6 +18,7 @@ class SpeechRecord:
     duration_seconds: float | None = None
     split: str = "train"
     source: str = ""
+    dataset_row: int | None = None
 
     def to_json(self) -> dict:
         return {
@@ -29,6 +30,7 @@ class SpeechRecord:
             "duration_seconds": self.duration_seconds,
             "split": self.split,
             "source": self.source,
+            "dataset_row": self.dataset_row,
         }
 
 
@@ -41,6 +43,7 @@ def make_record(
     duration_seconds: float | None = None,
     split: str = "train",
     source: str = "",
+    dataset_row: int | None = None,
 ) -> SpeechRecord:
     return SpeechRecord(
         audio_path=audio_path,
@@ -51,6 +54,7 @@ def make_record(
         duration_seconds=duration_seconds,
         split=split,
         source=source,
+        dataset_row=dataset_row,
     )
 
 
@@ -90,4 +94,3 @@ def validate_manifest(path: str | Path) -> dict:
         "missing_text": len(missing_text),
         "valid": bool(records) and not missing_audio and not missing_text,
     }
-

@@ -4,6 +4,7 @@ import csv
 import hashlib
 import json
 import os
+import secrets
 import subprocess
 import sys
 from collections import Counter
@@ -310,6 +311,19 @@ html, body, gradio-app, .gradio-container {
 .gradio-container .max_value,
 .gradio-container .head span { color: var(--ink-2) !important; }
 
+/* ---- Radio options: light segmented control with an obvious selected state ---- */
+.gradio-container [role="radiogroup"] label {
+  background: var(--paper) !important;
+  border: 1px solid var(--hair-strong) !important;
+  color: var(--ink) !important;
+  border-radius: var(--r-sm) !important;
+}
+.gradio-container [role="radiogroup"] label:has(input:checked) {
+  background: var(--mint) !important;
+  border-color: var(--line) !important;
+}
+.gradio-container [role="radiogroup"] label span { color: var(--ink) !important; }
+
 /* ---- Footer: quiet utility links, not primary buttons ---- */
 footer { color: var(--ink-2) !important; }
 footer button,
@@ -388,6 +402,7 @@ def sample_table(rows: list[dict]) -> list[list[str]]:
     return [
         [
             str(idx + 1),
+            str(row.get("dataset_row") if row.get("dataset_row") is not None else "legacy"),
             str(row.get("speaker_id") or "unknown"),
             str(row.get("language") or "aka"),
             str(row.get("split") or ""),
@@ -445,7 +460,7 @@ This preview audits examples only. Speaker-safe split generation and duration fi
 """
 
 
-def build_preview(split: str, limit: int):
+def build_preview(split: str, limit: int, sampling_mode: str, start_row: int, seed: int):
     ok, logs = run_command(
         [
             PYTHON,
@@ -456,6 +471,12 @@ def build_preview(split: str, limit: int):
             split,
             "--limit",
             str(int(limit)),
+            "--mode",
+            sampling_mode,
+            "--start-row",
+            str(int(start_row)),
+            "--seed",
+            str(int(seed)),
             "--output",
             str(PREVIEW_MANIFEST.relative_to(ROOT)),
         ],
@@ -489,8 +510,12 @@ def materialize_audio(limit: int):
     return status_html(ok, "Local audio pack", str(LOCAL_MANIFEST.relative_to(ROOT))), logs, first_audio, read_jsonl_preview(LOCAL_MANIFEST)
 
 
-def prepare_sample_pack(split: str, limit: int):
-    manifest_status, manifest_logs, preview = build_preview(split, limit)
+def prepare_sample_pack(
+    split: str, limit: int, sampling_mode: str, start_row: int, seed: int
+):
+    manifest_status, manifest_logs, preview = build_preview(
+        split, limit, sampling_mode, start_row, seed
+    )
     audio_status, audio_logs, audio, local_preview = materialize_audio(limit)
     rows = read_manifest_rows(LOCAL_MANIFEST) if LOCAL_MANIFEST.exists() else []
     choices = sample_choices(rows)
@@ -504,6 +529,10 @@ def prepare_sample_pack(split: str, limit: int):
         sample_table(rows),
         pack_quality(rows),
     )
+
+
+def new_sample_seed() -> int:
+    return secrets.randbelow(1_000_000_000)
 
 
 def dry_run_eval(model_id: str, limit: int, language: str):
@@ -828,15 +857,37 @@ def build_app() -> gr.Blocks:
                     with gr.Row():
                         split = gr.Dropdown(["train", "validation", "test"], value="test", label="Waxal split")
                         limit = gr.Slider(1, 10, value=5, step=1, label="Samples")
-                    prepare_btn = gr.Button("Build sample pack", variant="primary")
+                    with gr.Row():
+                        sampling_mode = gr.Radio(
+                            choices=[("Seeded random", "random"), ("Sequential window", "sequential")],
+                            value="random",
+                            label="Sampling mode",
+                        )
+                        start_row = gr.Number(
+                            value=0,
+                            minimum=0,
+                            precision=0,
+                            label="Sequential start row",
+                            info="Used only for sequential sampling.",
+                        )
+                        sample_seed = gr.Number(
+                            value=42,
+                            minimum=0,
+                            precision=0,
+                            label="Random seed",
+                            info="Same seed reproduces the same rows.",
+                        )
+                    with gr.Row():
+                        new_seed_btn = gr.Button("New seed", variant="secondary", size="sm", scale=1)
+                        prepare_btn = gr.Button("Build sample pack", variant="primary", scale=3)
                     sample_status = gr.HTML()
                     sample_picker = gr.Dropdown(label="Sample to inspect", choices=[])
                     with gr.Row():
                         sample_audio = gr.Audio(label="Selected sample audio", type="filepath", interactive=False)
                         sample_details = gr.Markdown("_Build a sample pack, then select a row._")
                     sample_rows = gr.Dataframe(
-                        headers=["#", "Speaker", "Language", "Split", "Reference", "Normalized"],
-                        datatype=["str", "str", "str", "str", "str", "str"],
+                        headers=["#", "Dataset row", "Speaker", "Language", "Split", "Reference", "Normalized"],
+                        datatype=["str", "str", "str", "str", "str", "str", "str"],
                         value=[],
                         interactive=False,
                         wrap=True,
@@ -846,9 +897,10 @@ def build_app() -> gr.Blocks:
                         sample_logs = gr.Textbox(label="Run log", lines=8, interactive=False)
                     prepare_btn.click(
                         prepare_sample_pack,
-                        inputs=[split, limit],
+                        inputs=[split, limit, sampling_mode, start_row, sample_seed],
                         outputs=[sample_status, sample_logs, sample_picker, sample_audio, sample_details, sample_rows, sample_quality],
                     ).then(app_summary, outputs=state)
+                    new_seed_btn.click(new_sample_seed, outputs=sample_seed)
                     sample_picker.change(selected_sample, inputs=sample_picker, outputs=[sample_audio, sample_details])
 
                 with gr.Tab("2 · Baseline"):
