@@ -10,9 +10,9 @@
 6. Prepare the full training set on CPU, then fine-tune Whisper small on an L4.
 7. Evaluate the best validation checkpoint once on frozen benchmark v1.
 8. Compare WER/CER, bootstrap interval, speaker slices, duration slices, and qualitative Akan outputs.
-6. Prepare GhanaNLP-only manifest and repeat.
-7. Mix Waxal + GhanaNLP only after both single-dataset runs are understood.
-8. Push to Hugging Face only if better.
+9. Prepare GhanaNLP-only manifest and repeat.
+10. Mix Waxal + GhanaNLP only after both single-dataset runs are understood.
+11. Push to Hugging Face only if better.
 
 ## TTS Later
 
@@ -50,5 +50,13 @@ This is evidence that clearing a trained checkpoint's inference prefix is not eq
 - Effective batch: 32 (`8 x 4` accumulation)
 - Validation batch: 8 on L4
 - Selection: lowest validation WER every 100 steps
+- Baseline validation WER: 32.69%
+- Step 100: 31.87%
+- Step 200: 31.58%
+- Step 300: 31.45% (selected)
+- Step 400: 31.83% (regressed)
 - Test discipline: benchmark v1 is never used for training or checkpoint selection
-- Promotion gate: beat 33.62% benchmark WER and pass manual Ghanaian review
+- Frozen benchmark: 32.65% WER / 12.26% CER versus 33.62% / 12.37% baseline
+- Paired bootstrap: 94.1% probability of improvement; 95% difference interval -2.22 to +0.20 points
+- Published candidate: `teckedd/whisper-small-waxal-akan-continuation-v1`
+- Promotion status: experimental until manual Ghanaian review and stronger evaluation evidence

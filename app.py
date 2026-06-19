@@ -804,11 +804,12 @@ def benchmark_board() -> str:
 
 **99 utterances · 33 held-out speakers · 0 speaker overlap · 0 duplicate audio**
 
-| Baseline | Decoder | WER | CER | 95% WER interval |
+| Model | Decoder | WER | CER | Status |
 |---|---|---:|---:|---:|
-| `teckedd/whisper_small-waxal_akan-asr-v1` | No forced language | {metrics['wer'] * 100:.2f}% | {metrics['cer'] * 100:.2f}% | {interval['low'] * 100:.2f}%–{interval['high'] * 100:.2f}% |
+| Published baseline | No forced language | {metrics['wer'] * 100:.2f}% | {metrics['cer'] * 100:.2f}% | 95% WER: {interval['low'] * 100:.2f}%–{interval['high'] * 100:.2f}% |
+| Continuation v1 | No forced language | **32.65%** | **12.26%** | Experimental; listening review due |
 
-No forced language and the stored Yoruba prompt produced identical outputs. English prompting failed badly, so the clean candidate uses no forced language token.
+The candidate improves WER by 0.97 points. A 5,000-sample paired bootstrap gives 94.1% probability of improvement, but its 95% difference interval crosses zero. No forced language and the stored Yoruba prompt produced identical outputs.
 """
 
 
@@ -964,10 +965,14 @@ def build_app() -> gr.Blocks:
 
                 with gr.Tab("2 · Baseline"):
                     gr.Markdown("## Reproduce the existing model\nEvaluate the published Waxal fine-tune on the exact sample pack prepared in step 1. The Yoruba hint is retained as a baseline experiment, not assumed to be optimal Akan handling.")
-                    model_id = gr.Textbox(
-                        value="teckedd/whisper_small-waxal_akan-asr-v1",
-                        label="Model ID",
-                        placeholder="openai/whisper-tiny or teckedd/whisper_small-waxal_akan-asr-v1",
+                    model_id = gr.Dropdown(
+                        choices=[
+                            "teckedd/whisper-small-waxal-akan-continuation-v1",
+                            "teckedd/whisper_small-waxal_akan-asr-v1",
+                        ],
+                        value="teckedd/whisper-small-waxal-akan-continuation-v1",
+                        label="Model",
+                        allow_custom_value=True,
                     )
                     with gr.Row():
                         eval_limit = gr.Slider(1, 5, value=1, step=1, label="Rows to evaluate")
@@ -1057,9 +1062,9 @@ def build_app() -> gr.Blocks:
                         | Arm | Configuration | Result |
                         |---|---|---|
                         | From base | No language prefix, raw labels | Stopped at step 200: 88.88% validation WER |
-                        | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Next controlled run |
+                        | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Best at step 300: 31.45% validation WER |
 
-                        The failed arm is retained as evidence: inference decoder behavior did not transfer to from-base training. Promotion still requires beating 33.62% on the frozen test benchmark and passing Ghanaian review.
+                        Continuation improved the full validation split from 32.69% to 31.45% WER; step 400 regressed to 31.83%, so checkpoint 300 was selected. It scored 32.65% on frozen test versus 33.62% baseline. The point estimate passes the numerical gate, but promotion remains locked pending Ghanaian listening review and stronger evidence.
                         """
                     )
                     with gr.Row():
@@ -1069,7 +1074,7 @@ def build_app() -> gr.Blocks:
                     with gr.Accordion("Technical log", open=False):
                         smoke_logs = gr.Textbox(label="Modal log", lines=10, interactive=False)
                     gr.Button(
-                        "Promotion stays locked until benchmark evaluation",
+                        "Promotion stays locked pending Ghanaian listening review",
                         interactive=False,
                     )
                     smoke_btn.click(
