@@ -42,17 +42,19 @@ def main() -> None:
         f"- Runtime: `{report['runtime_seconds']}s`",
         f"- WER: `{report['wer'] * 100:.2f}%`",
         f"- CER: `{report['cer'] * 100:.2f}%`",
+        f"- Repetition collapses: `{report.get('repetition_collapse_rows', 0)}`",
         f"- Word errors: `{report.get('substitutions', 0)} substitutions + {report.get('deletions', 0)} deletions + {report.get('insertions', 0)} insertions / {report.get('reference_words', 0)} reference words`",
         "",
         "## Per-row metrics",
         "",
-        "| Row | Speaker | Words | WER | CER | Sub | Del | Ins |",
-        "|---:|---|---:|---:|---:|---:|---:|---:|",
+        "| Row | Speaker | Words | WER | CER | Guard | Sub | Del | Ins |",
+        "|---:|---|---:|---:|---:|---|---:|---:|---:|",
     ]
     for row in predictions:
         lines.append(
             f"| {row['idx']} | `{row.get('speaker_id') or 'unknown'}` | {row.get('reference_words', 0)} | "
             f"{float(row.get('wer', 0)) * 100:.2f}% | {float(row.get('cer', 0)) * 100:.2f}% | "
+            f"{'retry' if row.get('repetition_collapse') else 'pass'} | "
             f"{row.get('substitutions', 0)} | {row.get('deletions', 0)} | {row.get('insertions', 0)} |"
         )
     lines.extend([

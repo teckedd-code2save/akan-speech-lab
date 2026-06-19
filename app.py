@@ -24,6 +24,8 @@ CORPUS_AUDIT = REPORTS_DIR / "waxal_aka_corpus_audit.json"
 DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
 SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
 SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
+CANDIDATE_MODEL_ID = "teckedd/whisper-small-waxal-akan-continuation-v1"
+LOCAL_CANDIDATE_MODEL = ROOT / "outputs/models/whisper-small-waxal-akan-continuation-v1/final"
 TTS_COMPARISON_DIR = ROOT / "outputs/tts_comparisons"
 TTS_MODEL_ID = "facebook/mms-tts-aka"
 _TTS_MODEL = None
@@ -565,6 +567,9 @@ def dry_run_eval(model_id: str, limit: int, language: str):
 
 
 def cache_model(model_id: str):
+    if model_id == CANDIDATE_MODEL_ID and LOCAL_CANDIDATE_MODEL.exists():
+        logs = f"Using verified local checkpoint: {LOCAL_CANDIDATE_MODEL}"
+        return status_html(True, "Model cache", model_id), logs
     ok, logs = run_command([PYTHON, "scripts/cache_hf_model.py", "--model-id", model_id], timeout=1800)
     return status_html(ok, "Model cache", model_id), logs
 
@@ -572,16 +577,23 @@ def cache_model(model_id: str):
 def run_eval(model_id: str, limit: int, language: str):
     manifest = LOCAL_MANIFEST if LOCAL_MANIFEST.exists() else PREVIEW_MANIFEST
     if not manifest.exists():
-        return status_html(False, "ASR eval", "Prepare a sample pack first."), "", "", None
+        return status_html(False, "ASR eval", "Prepare a sample pack first."), "", "", None, None
     safe_name = model_id.replace("/", "__").replace(":", "_")
     json_path = REPORTS_DIR / f"{safe_name}_eval_{int(limit)}row.json"
     csv_path = REPORTS_DIR / f"{safe_name}_eval_{int(limit)}row.csv"
     md_path = REPORTS_DIR / f"{safe_name}_eval_{int(limit)}row.md"
+    model_source = (
+        str(LOCAL_CANDIDATE_MODEL)
+        if model_id == CANDIDATE_MODEL_ID and LOCAL_CANDIDATE_MODEL.exists()
+        else model_id
+    )
     ok, logs = run_command(
         [
             PYTHON,
             "scripts/eval_asr_manifest.py",
             "--model-id",
+            model_source,
+            "--display-model-id",
             model_id,
             "--manifest",
             str(manifest.relative_to(ROOT)),
@@ -616,7 +628,8 @@ def run_eval(model_id: str, limit: int, language: str):
         if ok_render and md_path.exists():
             report_md = md_path.read_text(encoding="utf-8")
             report_file = str(md_path)
-    return status_html(ok, "ASR eval", model_id), logs, report_md or "No report rendered.", report_file
+    report_path = str(json_path.relative_to(ROOT)) if ok and json_path.exists() else None
+    return status_html(ok, "ASR eval", model_id), logs, report_md or "No report rendered.", report_file, report_path
 
 
 def report_choices() -> gr.Dropdown:
@@ -711,6 +724,14 @@ def load_eval_inspector(report_path: str):
     return gr.Dropdown(choices=choices, value="0" if choices else None), audio, reference, prediction, metrics
 
 
+def refresh_eval_inspector(report_path: str):
+    dropdown = eval_json_choices()
+    if report_path and (ROOT / report_path).exists():
+        dropdown = gr.Dropdown(choices=dropdown.choices, value=report_path)
+    row, audio, reference, prediction, metrics = load_eval_inspector(report_path)
+    return dropdown, row, audio, reference, prediction, metrics, None, None, ""
+
+
 def _load_akan_tts():
     global _TTS_MODEL, _TTS_TOKENIZER
     if _TTS_MODEL is None or _TTS_TOKENIZER is None:
@@ -800,6 +821,17 @@ def benchmark_board() -> str:
     metrics = strategy["metrics"]
     interval = strategy["wer_95_percent_interval"]
     return f"""
+### Full held-out Waxal test
+
+**1,522 utterances · 52,205 reference words · excluded from training and model selection**
+
+| Model | WER | CER |
+|---|---:|---:|
+| Published baseline | 33.84% | 12.74% |
+| Continuation v1 | **32.77%** | **12.47%** |
+
+Paired bootstrap: **99.86% probability of improvement**; 95% candidate-minus-baseline WER interval **-1.90 to -0.33 points**. The candidate improved 524 rows, tied 603, worsened 395, and produced two severe repetition loops.
+
 ### Frozen benchmark v1
 
 **99 utterances · 33 held-out speakers · 0 speaker overlap · 0 duplicate audio**
@@ -881,7 +913,7 @@ def comparison_board() -> str:
 
 
 def build_app() -> gr.Blocks:
-    with gr.Blocks(title="Akan Speech Lab") as demo:
+    with gr.Blocks(title="Akan Speech Lab", css=CSS) as demo:
         with gr.Column(elem_classes=["ak-shell"]):
             gr.HTML(
                 """
@@ -967,10 +999,10 @@ def build_app() -> gr.Blocks:
                     gr.Markdown("## Reproduce the existing model\nEvaluate the published Waxal fine-tune on the exact sample pack prepared in step 1. The Yoruba hint is retained as a baseline experiment, not assumed to be optimal Akan handling.")
                     model_id = gr.Dropdown(
                         choices=[
-                            "teckedd/whisper-small-waxal-akan-continuation-v1",
+                            CANDIDATE_MODEL_ID,
                             "teckedd/whisper_small-waxal_akan-asr-v1",
                         ],
-                        value="teckedd/whisper-small-waxal-akan-continuation-v1",
+                        value=CANDIDATE_MODEL_ID,
                         label="Model",
                         allow_custom_value=True,
                     )
@@ -998,13 +1030,9 @@ def build_app() -> gr.Blocks:
                         label="Rendered report",
                     )
                     eval_report_file = gr.File(label="Report file", interactive=False)
+                    eval_report_path = gr.State()
                     dry_btn.click(dry_run_eval, inputs=[model_id, eval_limit, language], outputs=[eval_status, eval_logs])
                     cache_btn.click(cache_model, inputs=model_id, outputs=[eval_status, eval_logs])
-                    eval_btn.click(
-                        run_eval,
-                        inputs=[model_id, eval_limit, language],
-                        outputs=[eval_status, eval_logs, eval_report, eval_report_file],
-                    ).then(app_summary, outputs=state)
 
                     gr.Markdown(
                         "## Listen row by row\nPlay the original recording, then generate the reference and prediction with the same Akan TTS model. This makes text differences audible without changing the ASR score."
@@ -1024,6 +1052,25 @@ def build_app() -> gr.Blocks:
                             prediction_audio = gr.Audio(label="Synthesized prediction", type="filepath", interactive=False)
                     synthesize_pair = gr.Button("Generate both Akan audios", variant="primary")
                     synthesis_status = gr.HTML()
+                    eval_btn.click(
+                        run_eval,
+                        inputs=[model_id, eval_limit, language],
+                        outputs=[eval_status, eval_logs, eval_report, eval_report_file, eval_report_path],
+                    ).then(
+                        refresh_eval_inspector,
+                        inputs=eval_report_path,
+                        outputs=[
+                            listen_report,
+                            listen_row,
+                            original_audio,
+                            reference_text,
+                            prediction_text,
+                            listen_metrics,
+                            reference_audio,
+                            prediction_audio,
+                            synthesis_status,
+                        ],
+                    ).then(app_summary, outputs=state)
                     listen_report.change(
                         load_eval_inspector,
                         inputs=listen_report,
@@ -1064,7 +1111,7 @@ def build_app() -> gr.Blocks:
                         | From base | No language prefix, raw labels | Stopped at step 200: 88.88% validation WER |
                         | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Best at step 300: 31.45% validation WER |
 
-                        Continuation improved the full validation split from 32.69% to 31.45% WER; step 400 regressed to 31.83%, so checkpoint 300 was selected. It scored 32.65% on frozen test versus 33.62% baseline. The point estimate passes the numerical gate, but promotion remains locked pending Ghanaian listening review and stronger evidence.
+                        Continuation improved the full validation split from 32.69% to 31.45% WER; step 400 regressed to 31.83%, so checkpoint 300 was selected. The full 1,522-row test improves from 33.84% to 32.77% with a paired interval below zero. Repetition collapse is now detected in evaluation; promotion remains locked pending Ghanaian listening review and validation of the guarded retry policy.
                         """
                     )
                     with gr.Row():
@@ -1074,7 +1121,7 @@ def build_app() -> gr.Blocks:
                     with gr.Accordion("Technical log", open=False):
                         smoke_logs = gr.Textbox(label="Modal log", lines=10, interactive=False)
                     gr.Button(
-                        "Promotion stays locked pending Ghanaian listening review",
+                        "Promotion locked: listening review + guarded retry validation",
                         interactive=False,
                     )
                     smoke_btn.click(
@@ -1101,4 +1148,4 @@ def build_app() -> gr.Blocks:
 
 
 if __name__ == "__main__":
-    build_app().queue().launch(server_name="127.0.0.1", server_port=7862, css=CSS)
+    build_app().queue().launch(server_name="127.0.0.1", server_port=7862)

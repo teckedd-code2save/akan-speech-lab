@@ -14,6 +14,7 @@ from akan_speech.data.normalize import normalize_akan_text
 from akan_speech.eval.breakdown import grouped_error_rates
 from akan_speech.eval.tokenization import tokenizer_fragmentation
 from akan_speech.eval.wer import speech_error_rates
+from akan_speech.inference.guard import has_repetition_collapse
 
 
 def transcribe(pipe: Any, audio_path: str, generate_kwargs: dict[str, Any]) -> str:
@@ -27,6 +28,11 @@ def transcribe(pipe: Any, audio_path: str, generate_kwargs: dict[str, Any]) -> s
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate a HF ASR model on a JSONL speech manifest.")
     parser.add_argument("--model-id", required=True)
+    parser.add_argument(
+        "--display-model-id",
+        default="",
+        help="Stable model ID recorded in reports when --model-id is a local checkpoint path.",
+    )
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--limit", type=int, default=0)
     parser.add_argument("--device", default="auto", choices=["auto", "cpu", "mps", "cuda"])
@@ -91,7 +97,12 @@ def main() -> None:
         "automatic-speech-recognition",
         model=args.model_id,
         device=device,
+        torch_dtype=torch.float16 if device in {0, "mps"} else torch.float32,
     )
+    pipe.model.config.forced_decoder_ids = None
+    pipe.model.generation_config.forced_decoder_ids = None
+    pipe.model.generation_config.language = args.language or None
+    pipe.model.generation_config.task = args.task
     print(f"Loaded model on device={device}. Evaluating {len(rows)} row(s).", flush=True)
 
     predictions = []
@@ -125,6 +136,7 @@ def main() -> None:
                 "prediction": prediction,
                 "normalized_reference": normalize_akan_text(reference),
                 "normalized_prediction": normalize_akan_text(prediction),
+                "repetition_collapse": has_repetition_collapse(prediction),
                 **row_metrics,
             }
         )
@@ -133,7 +145,7 @@ def main() -> None:
     metrics = speech_error_rates(references, predictions)
     tokenizer = AutoTokenizer.from_pretrained(args.model_id)
     report = {
-        "model_id": args.model_id,
+        "model_id": args.display_model_id or args.model_id,
         "manifest": args.manifest,
         "rows": len(rows),
         "device": str(device),
@@ -144,6 +156,7 @@ def main() -> None:
         "by_speaker": grouped_error_rates(result_rows, "speaker_id"),
         "by_duration": grouped_error_rates(result_rows, "duration_bucket"),
         "tokenizer_fragmentation": tokenizer_fragmentation(tokenizer, references),
+        "repetition_collapse_rows": sum(row["repetition_collapse"] for row in result_rows),
         **metrics,
     }
 

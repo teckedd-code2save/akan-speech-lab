@@ -58,5 +58,9 @@ This is evidence that clearing a trained checkpoint's inference prefix is not eq
 - Test discipline: benchmark v1 is never used for training or checkpoint selection
 - Frozen benchmark: 32.65% WER / 12.26% CER versus 33.62% / 12.37% baseline
 - Paired bootstrap: 94.1% probability of improvement; 95% difference interval -2.22 to +0.20 points
+- Full 1,522-row test: 32.77% WER / 12.47% CER versus 33.84% / 12.74% baseline
+- Full-test paired bootstrap: 99.86% probability of improvement; 95% difference interval
+  -1.90 to -0.33 points
+- Full-test row outcomes: 524 better, 603 tied, 395 worse, 2 severe repetition loops
 - Published candidate: `teckedd/whisper-small-waxal-akan-continuation-v1`
-- Promotion status: experimental until manual Ghanaian review and stronger evaluation evidence
+- Promotion status: experimental until manual Ghanaian review and validation of the guarded retry policy; repetition-collapse detection is implemented

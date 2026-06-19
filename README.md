@@ -71,7 +71,7 @@ Default workflow is local and CPU-safe. Modal GPU jobs should only run after:
 
 The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`. On this repo's frozen 99-row, 33-speaker Waxal benchmark it scores **33.62% WER / 12.37% CER** with a 30.91%-36.79% bootstrap WER interval. No forced language and the checkpoint's stored Yoruba prompt produce identical predictions; English prompting is invalid for this model. The first candidate therefore uses no forced language token.
 
-The first evidence-driven continuation run improved the complete 1,123-row validation split from **32.69% to 31.45% WER** at step 300. Step 400 regressed to 31.83%. On the frozen benchmark, the selected checkpoint reached **32.65% WER / 12.26% CER**, a 0.97-point WER improvement over baseline. A paired bootstrap assigns 94.1% probability of improvement, but the 95% difference interval crosses zero. The [experimental candidate](https://huggingface.co/teckedd/whisper-small-waxal-akan-continuation-v1) is published for listening review, not yet promoted as production-ready.
+The first evidence-driven continuation run improved the complete 1,123-row validation split from **32.69% to 31.45% WER** at step 300. Step 400 regressed to 31.83%. On all 1,522 held-out Waxal test rows, the selected checkpoint improves **33.84% to 32.77% WER** and **12.74% to 12.47% CER**. A 5,000-sample paired bootstrap gives 99.86% probability of improvement and a -1.90 to -0.33 point 95% WER-difference interval. The [experimental candidate](https://huggingface.co/teckedd/whisper-small-waxal-akan-continuation-v1) remains gated because two outputs entered severe repetition loops and Ghanaian listening review is pending.
 
 ## Key Docs
 

@@ -20,12 +20,14 @@ image = (
     .apt_install("ffmpeg", "libsndfile1")
     .uv_pip_install(
         "accelerate==1.8.1",
+        "datasets[audio]==3.6.0",
         "jiwer==4.0.0",
         "librosa==0.11.0",
         "numpy<2.3",
         "requests==2.32.4",
         "soundfile==0.13.1",
         "torch==2.7.1",
+        "torchaudio==2.7.1",
         "transformers==4.53.2",
     )
     .env({"HF_HOME": f"{CACHE_DIR}/huggingface", "HF_XET_HIGH_PERFORMANCE": "1"})
@@ -62,6 +64,119 @@ def error_rates(references: list[str], predictions: list[str]) -> dict:
         "deletions": int(words.deletions),
         "insertions": int(words.insertions),
     }
+
+
+@app.function(
+    image=image,
+    cpu=8,
+    memory=32768,
+    volumes={CACHE_DIR: cache_volume},
+    timeout=2 * HOUR,
+)
+def prepare_waxal_test() -> dict:
+    from datasets import Audio, load_dataset
+
+    prepared_path = Path(CACHE_DIR) / "prepared" / "waxal-aka-asr-test-v1"
+    if prepared_path.exists():
+        return {"status": "cached", "path": str(prepared_path)}
+    parquet_url = (
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/"
+        "refs%2Fconvert%2Fparquet/aka_asr/test/0000.parquet"
+    )
+    dataset = load_dataset(
+        "parquet",
+        data_files=parquet_url,
+        split="train",
+        cache_dir=CACHE_DIR,
+    ).cast_column("audio", Audio(sampling_rate=16000))
+    prepared_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset.save_to_disk(str(prepared_path))
+    cache_volume.commit()
+    return {"status": "prepared", "path": str(prepared_path), "rows": len(dataset)}
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=4,
+    memory=32768,
+    volumes={
+        CACHE_DIR: cache_volume,
+        CHECKPOINT_DIR: checkpoint_volume,
+        OUTPUT_DIR: output_volume,
+    },
+    secrets=[modal.Secret.from_name("huggingface-token", required_keys=["HF_TOKEN"])],
+    timeout=2 * HOUR,
+    scaledown_window=30,
+)
+def compare_full_test(models: list[dict], batch_size: int, report_name: str) -> dict:
+    import time
+
+    import torch
+    from datasets import load_from_disk
+    from transformers import pipeline
+
+    dataset = load_from_disk(str(Path(CACHE_DIR) / "prepared" / "waxal-aka-asr-test-v1"))
+    references = [str(text or "") for text in dataset["transcription"]]
+    runs = {}
+    for model_spec in models:
+        started = time.perf_counter()
+        asr = pipeline(
+            "automatic-speech-recognition",
+            model=model_spec["source"],
+            device=0,
+            torch_dtype=torch.float16,
+        )
+        asr.model.config.forced_decoder_ids = None
+        asr.model.generation_config.forced_decoder_ids = None
+        asr.model.generation_config.language = None
+        asr.model.generation_config.task = "transcribe"
+        predictions = []
+        rows = []
+        for start in range(0, len(dataset), batch_size):
+            batch = dataset[start : start + batch_size]
+            audio_inputs = [
+                {"array": audio["array"], "sampling_rate": audio["sampling_rate"]}
+                for audio in batch["audio"]
+            ]
+            outputs = asr(
+                audio_inputs,
+                batch_size=batch_size,
+                generate_kwargs={"task": "transcribe"},
+            )
+            if isinstance(outputs, dict):
+                outputs = [outputs]
+            for offset, output in enumerate(outputs):
+                index = start + offset
+                reference = references[index]
+                prediction = str(output.get("text") or "").strip()
+                predictions.append(prediction)
+                rows.append(
+                    {
+                        "idx": index,
+                        "dataset_row": index,
+                        "speaker_id": batch["speaker_id"][offset],
+                        "reference": reference,
+                        "prediction": prediction,
+                        **error_rates([reference], [prediction]),
+                    }
+                )
+            print(f"{model_spec['name']}: {min(start + batch_size, len(dataset))}/{len(dataset)}")
+        runs[model_spec["name"]] = {
+            "model_id": model_spec["model_id"],
+            "runtime_seconds": round(time.perf_counter() - started, 3),
+            "rows": len(rows),
+            "metrics": error_rates(references, predictions),
+            "predictions": rows,
+        }
+        del asr
+        torch.cuda.empty_cache()
+
+    result = {"dataset": "google/WaxalNLP/aka_asr/test", "rows": len(dataset), "runs": runs}
+    result_path = Path(OUTPUT_DIR) / report_name
+    result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+    output_volume.commit()
+    return result
 
 
 @app.function(
@@ -180,7 +295,36 @@ def main(
     output: str = "evals/reports/waxal_decoder_comparison.json",
     batch_size: int = 4,
     strategies: str = "no_forced_language,yoruba,english",
+    full_test: bool = False,
 ):
+    if full_test:
+        print("Preparing the full Waxal test split on CPU...")
+        print(json.dumps(prepare_waxal_test.remote(), indent=2))
+        models = [
+            {
+                "name": "published_baseline",
+                "model_id": "teckedd/whisper_small-waxal_akan-asr-v1",
+                "source": "teckedd/whisper_small-waxal_akan-asr-v1",
+            },
+            {
+                "name": "continuation_v1",
+                "model_id": "teckedd/whisper-small-waxal-akan-continuation-v1",
+                "source": (
+                    f"{CHECKPOINT_DIR}/whisper-small-waxal-aka-continued-yoruba-v1/final"
+                ),
+            },
+        ]
+        result = compare_full_test.remote(models, batch_size, Path(output).name)
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+        print(
+            json.dumps(
+                {name: run["metrics"] for name, run in result["runs"].items()}, indent=2
+            )
+        )
+        print(f"Wrote {path}")
+        return
     records = [json.loads(line) for line in Path(manifest).read_text().splitlines() if line.strip()]
     selected_strategies = [item.strip() for item in strategies.split(",") if item.strip()]
     invalid = set(selected_strategies) - {"no_forced_language", "yoruba", "english"}
