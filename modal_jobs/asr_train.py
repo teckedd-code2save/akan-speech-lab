@@ -56,6 +56,7 @@ class TrainConfig:
     eval_limit: int = 0
     seed: int = 42
     normalize_labels: bool = False
+    resume_checkpoint: str = ""
 
 
 def normalize_akan_text(text: str) -> str:
@@ -331,9 +332,19 @@ def train_asr(config_dict: dict) -> dict:
         compute_metrics=compute_metrics,
         callbacks=[CommitCheckpointCallback()],
     )
-    baseline_metrics = trainer.evaluate(metric_key_prefix="baseline")
-    trainer.save_metrics("baseline", baseline_metrics)
-    train_result = trainer.train()
+    if config.resume_checkpoint:
+        checkpoint_path = Path(config.resume_checkpoint)
+        if not checkpoint_path.exists():
+            raise RuntimeError(f"Resume checkpoint missing at {checkpoint_path}")
+        baseline_path = run_dir / "baseline_results.json"
+        if not baseline_path.exists():
+            raise RuntimeError(f"Baseline metrics missing at {baseline_path}")
+        baseline_metrics = json.loads(baseline_path.read_text())
+        print(f"Resuming from {checkpoint_path}; reusing persisted baseline metrics")
+    else:
+        baseline_metrics = trainer.evaluate(metric_key_prefix="baseline")
+        trainer.save_metrics("baseline", baseline_metrics)
+    train_result = trainer.train(resume_from_checkpoint=config.resume_checkpoint or None)
     trainer.save_model(str(run_dir / "final"))
     processor.save_pretrained(str(run_dir / "final"))
     trainer.save_metrics("train", train_result.metrics)
@@ -362,6 +373,7 @@ def main(
     max_steps: int = 1200,
     decoder_strategy: str = "no_forced_language",
     arm: str = "from_base",
+    resume_step: int = 0,
 ):
     if decoder_strategy not in {"no_forced_language", "yoruba", "english"}:
         raise ValueError("decoder_strategy must be no_forced_language, yoruba, or english")
@@ -378,6 +390,8 @@ def main(
         config.normalize_labels = True
     elif arm != "from_base":
         raise ValueError("arm must be from_base or continue_yoruba")
+    if resume_step:
+        config.resume_checkpoint = f"{OUTPUT_DIR}/{config.run_name}/checkpoint-{resume_step}"
     if smoke:
         config.run_name = "smoke-whisper-small-waxal-aka-no-language-v5"
         config.max_steps = 2

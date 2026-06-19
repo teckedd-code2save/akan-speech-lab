@@ -30,6 +30,15 @@ The smoke run uses 32 train rows, 16 validation rows, and two steps. It must wri
 modal run modal_jobs/asr_train.py --max-steps 1200
 ```
 
+Resume a disconnected run from a durable checkpoint. Use detached mode so a local network
+drop cannot terminate the remote job:
+
+```bash
+modal run --detach modal_jobs/asr_train.py \
+  --arm continue_yoruba \
+  --resume-step 100
+```
+
 At the June 2026 L4 list price of about $0.80/hour, a conservative three-hour full-run estimate is $2.40. Dataset preparation must run on CPU first so download time does not consume L4 minutes.
 
 Retrieve a result:
