@@ -12,6 +12,28 @@
 8. Compare WER/CER, bootstrap interval, speaker slices, duration slices, and qualitative Akan outputs.
 9. Prepare GhanaNLP-only manifest and repeat.
 10. Mix Waxal + GhanaNLP only after both single-dataset runs are understood.
+
+## GhanaNLP-Only Arm
+
+- Base: `teckedd/whisper-small-waxal-akan-continuation-v1`
+- Training data: GhanaNLP only; Waxal is not mixed into this arm.
+- Split: stable normalized-transcript groups, 90/5/5.
+- Model selection: validation only; the GhanaNLP test partition remains untouched.
+- First configuration: 400 steps, `3e-6`, 50 warmup steps, evaluate/save every 100 steps.
+- Decoder variable held constant: Yoruba-compatible training prefix inherited from the prior checkpoint.
+- Two-step smoke: passed on L4 with 32 train, 12 validation, and 17 untouched test rows.
+- Smoke WER: 72.09% before and after two steps. This proves wiring and exposes cross-corpus domain shift; it is not model evidence.
+- Required post-training checks: GhanaNLP held-out test, complete Waxal test for catastrophic forgetting, repetition guard, and Ghanaian listening review.
+
+### GhanaNLP Round 1 Result
+
+- Selected checkpoint: step 400 at 84.58% validation WER, down from 165.53% baseline.
+- Untouched GhanaNLP test: 160.65% to 99.35% WER; 341 rows better, 163 tied, 67 worse.
+- GhanaNLP test repetition collapses: 17 baseline to 1 candidate.
+- Waxal full test: 32.77% to 37.80% WER; 407 rows better, 226 tied, 889 worse.
+- Waxal paired 95% WER-change interval: +3.67 to +7.10 points.
+- Promotion decision: **failed** because absolute GhanaNLP quality remains poor and Waxal regression is material.
+- Next experiment: mixed Waxal replay or a GhanaNLP adapter; do not continue GhanaNLP-only full-model training.
 11. Push to Hugging Face only if better.
 
 ## TTS Later

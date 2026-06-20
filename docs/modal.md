@@ -26,6 +26,15 @@ modal run modal_jobs/asr_train.py --smoke
 
 The smoke run uses 32 train rows, 16 validation rows, and two steps. It must write `summary.json` before a full run is allowed.
 
+Run the isolated GhanaNLP wiring smoke and full continuation:
+
+```bash
+modal run modal_jobs/asr_train.py --smoke --arm ghana_nlp_only
+modal run modal_jobs/asr_train.py --arm ghana_nlp_only
+```
+
+The full arm first prepares and persists the dataset on CPU, then allocates an L4. Its held-out test split is saved but never passed to the trainer.
+
 ```bash
 modal run modal_jobs/asr_train.py --max-steps 1200
 ```

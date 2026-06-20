@@ -25,3 +25,21 @@ def test_corpus_audit_detects_cross_split_leakage():
 
     assert report["cross_split_text_groups"] == 1
     assert report["speaker_overlap"]["test_x_train"]["count"] == 1
+
+
+def test_corpus_audit_does_not_count_missing_speaker_as_one_person():
+    report = corpus_audit(
+        [
+            {
+                "split": "train",
+                "speaker_id": None,
+                "sample_id": "row-1",
+                "normalized_text": "maakye",
+                "dataset_row": 1,
+                "language": "aka",
+            }
+        ]
+    )
+
+    assert report["unique_speakers"] == 0
+    assert report["speakers_by_split"] == {}

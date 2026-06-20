@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -11,6 +12,7 @@ MINUTE = 60
 HOUR = 60 * MINUTE
 CACHE_DIR = "/cache"
 OUTPUT_DIR = "/outputs"
+GHANA_NLP_DATASET_ID = "ghananlpcommunity/twi-speech-text-multispeaker-16k"
 
 app = modal.App("akan-speech-asr-train")
 cache_volume = modal.Volume.from_name("akan-speech-hf-cache", create_if_missing=True)
@@ -68,6 +70,19 @@ def normalize_akan_text(text: str) -> str:
     return re.sub(r"\s+", " ", value).strip()
 
 
+def stable_text_split(text: str, seed: int) -> str:
+    normalized = normalize_akan_text(text)
+    if not normalized:
+        return "discard"
+    digest = hashlib.sha256(f"{seed}:{normalized}".encode()).digest()
+    bucket = int.from_bytes(digest[:8], "big") / 2**64
+    if bucket < 0.9:
+        return "train"
+    if bucket < 0.95:
+        return "validation"
+    return "test"
+
+
 @dataclass
 class DataCollatorSpeechSeq2SeqWithPadding:
     processor: object
@@ -94,8 +109,9 @@ class DataCollatorSpeechSeq2SeqWithPadding:
 def prepared_dataset_path(config: TrainConfig) -> Path:
     model_name = config.base_model.rsplit("/", 1)[-1]
     label_style = "clean" if config.normalize_labels else "raw"
+    dataset_name = config.dataset_id.rsplit("/", 1)[-1]
     return Path(CACHE_DIR) / "prepared" / (
-        f"{config.dataset_config}-{model_name}-{config.decoder_strategy}-{label_style}-v1"
+        f"{dataset_name}-{config.dataset_config}-{model_name}-{config.decoder_strategy}-{label_style}-v1"
     )
 
 
@@ -135,12 +151,30 @@ def prepare_dataset(config: TrainConfig, feature_extractor, tokenizer):
             raise RuntimeError(f"Expected {limit} {split} rows, received {len(rows)}")
         return Dataset.from_list(rows)
 
-    dataset = DatasetDict(
-        {
-            "train": load_split("train", config.train_limit),
-            "validation": load_split("validation", config.eval_limit),
+    if config.dataset_id == GHANA_NLP_DATASET_ID:
+        source_limit = 0
+        if config.train_limit or config.eval_limit:
+            source_limit = max(256, config.train_limit + config.eval_limit)
+        source = load_split("train", source_limit)
+        split_names = [stable_text_split(str(text or ""), config.seed) for text in source["text"]]
+        split_indices = {
+            name: [index for index, split_name in enumerate(split_names) if split_name == name]
+            for name in ("train", "validation", "test")
         }
-    )
+        if config.train_limit:
+            split_indices["train"] = split_indices["train"][: config.train_limit]
+        if config.eval_limit:
+            split_indices["validation"] = split_indices["validation"][: config.eval_limit]
+        dataset = DatasetDict(
+            {name: source.select(indices) for name, indices in split_indices.items()}
+        )
+    else:
+        dataset = DatasetDict(
+            {
+                "train": load_split("train", config.train_limit),
+                "validation": load_split("validation", config.eval_limit),
+            }
+        )
     dataset = dataset.cast_column("audio", Audio(sampling_rate=16000))
 
     def prepare_row(row):
@@ -151,11 +185,8 @@ def prepare_dataset(config: TrainConfig, feature_extractor, tokenizer):
         row["input_features"] = extracted.input_features[0]
         row["attention_mask"] = extracted.attention_mask[0]
         row["input_length"] = len(audio["array"])
-        text = (
-            normalize_akan_text(row["transcription"])
-            if config.normalize_labels
-            else row["transcription"]
-        )
+        raw_text = row.get("transcription") or row.get("text") or row.get("sentence") or ""
+        text = normalize_akan_text(raw_text) if config.normalize_labels else raw_text
         row["labels"] = tokenizer(text).input_ids
         return row
 
@@ -209,6 +240,7 @@ def prepare_full_training_data(config_dict: dict) -> dict:
         "prepared_dataset": str(target),
         "train_rows": len(dataset["train"]),
         "validation_rows": len(dataset["validation"]),
+        "test_rows": len(dataset.get("test", [])),
         "decoder_strategy": config.decoder_strategy,
     }
     marker.write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
@@ -357,6 +389,7 @@ def train_asr(config_dict: dict) -> dict:
         "config": asdict(config),
         "train_rows": len(dataset["train"]),
         "validation_rows": len(dataset["validation"]),
+        "test_rows": len(dataset.get("test", [])),
         "baseline_metrics": baseline_metrics,
         "train_metrics": train_result.metrics,
         "final_metrics": final_metrics,
@@ -388,12 +421,24 @@ def main(
         config.eval_steps = 100
         config.save_steps = 100
         config.normalize_labels = True
+    elif arm == "ghana_nlp_only":
+        config.run_name = "whisper-small-ghana-nlp-continued-v1"
+        config.base_model = "teckedd/whisper-small-waxal-akan-continuation-v1"
+        config.dataset_id = GHANA_NLP_DATASET_ID
+        config.dataset_config = "default"
+        config.decoder_strategy = "yoruba"
+        config.max_steps = 400
+        config.learning_rate = 3e-6
+        config.warmup_steps = 50
+        config.eval_steps = 100
+        config.save_steps = 100
+        config.normalize_labels = True
     elif arm != "from_base":
-        raise ValueError("arm must be from_base or continue_yoruba")
+        raise ValueError("arm must be from_base, continue_yoruba, or ghana_nlp_only")
     if resume_step:
         config.resume_checkpoint = f"{OUTPUT_DIR}/{config.run_name}/checkpoint-{resume_step}"
     if smoke:
-        config.run_name = "smoke-whisper-small-waxal-aka-no-language-v5"
+        config.run_name = f"smoke-{arm.replace('_', '-')}-v1"
         config.max_steps = 2
         config.warmup_steps = 0
         config.eval_steps = 1

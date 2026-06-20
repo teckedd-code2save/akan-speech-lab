@@ -28,7 +28,8 @@ def corpus_audit(records: list[dict[str, Any]]) -> dict[str, Any]:
     for row in records:
         split = str(row.get("split") or "unknown")
         speaker = str(row.get("speaker_id") or "unknown")
-        speakers_by_split[split].add(speaker)
+        if speaker != "unknown":
+            speakers_by_split[split].add(speaker)
         sample_id = str(row.get("sample_id") or "")
         normalized = str(row.get("normalized_text") or "").strip()
         location = (split, row.get("dataset_row"))

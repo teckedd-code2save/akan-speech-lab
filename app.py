@@ -21,9 +21,15 @@ LOCAL_MANIFEST = ROOT / "evals/samples/waxal_aka_asr_test_preview_local.jsonl"
 REPORTS_DIR = ROOT / "evals/reports"
 BENCHMARK_INDEX = ROOT / "evals/waxal_aka_benchmark_v1.json"
 CORPUS_AUDIT = REPORTS_DIR / "waxal_aka_corpus_audit.json"
+GHANA_NLP_MANIFEST = ROOT / "data/manifests/ghana_nlp_twi.jsonl"
+GHANA_NLP_AUDIT = REPORTS_DIR / "ghana_nlp_corpus_audit.json"
+GHANA_NLP_TEST_REPORT = REPORTS_DIR / "ghana-nlp-test-continuation-v1.json"
+GHANA_WAXAL_TEST_REPORT = REPORTS_DIR / "waxal-test-ghana-nlp-continuation-v1.json"
 DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
 SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
 SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
+GHANA_SMOKE_RUN_NAME = "smoke-ghana-nlp-only-v1"
+GHANA_SMOKE_SUMMARY = ROOT / "outputs/modal" / GHANA_SMOKE_RUN_NAME / "summary.json"
 CANDIDATE_MODEL_ID = "teckedd/whisper-small-waxal-akan-continuation-v1"
 LOCAL_CANDIDATE_MODEL = ROOT / "outputs/models/whisper-small-waxal-akan-continuation-v1/final"
 TTS_COMPARISON_DIR = ROOT / "outputs/tts_comparisons"
@@ -368,6 +374,40 @@ def status_html(ok: bool, title: str, body: str = "") -> str:
       <div class="ak-chiprow"><span class="ak-chip {color}">{'pass' if ok else 'check logs'}</span></div>
     </div>
     """
+
+
+def ghana_nlp_audit_summary() -> str:
+    if not GHANA_NLP_AUDIT.exists():
+        return "_Run the metadata audit before enabling a GhanaNLP training arm._"
+    report = json.loads(GHANA_NLP_AUDIT.read_text(encoding="utf-8"))
+    counts = report.get("split_counts", {})
+    durations = report.get("durations", {})
+    return f"""
+### GhanaNLP readiness
+
+| Check | Result |
+|---|---|
+| Current Viewer rows | **{report.get('viewer_count', 0):,}** |
+| Usable transcript rows | **{report.get('usable_transcript_rows', report.get('records', 0)):,}** · {report.get('dropped_empty_transcript_rows', 0):,} dropped |
+| Audio hours from metadata | **{float(durations.get('total_hours', 0)):.2f} h** |
+| Training-duration filter | **{durations.get('training_eligible', 0):,} eligible** · {durations.get('below_training_minimum', 0):,} below 0.4 s |
+| Deterministic partitions | train **{counts.get('train', 0):,}** · validation **{counts.get('validation', 0):,}** · test **{counts.get('test', 0):,}** |
+| Duplicate transcript groups | **{report.get('duplicate_text_groups', 0):,}** kept within one partition |
+| Empty transcripts retained | **{report.get('empty_text', 0):,}** |
+| Speaker-safe split | **Not claimable**: the published schema has no speaker identifier |
+| Dataset-card consistency | **Mismatch**: card says 21,138 pairs; current Viewer exposes {report.get('viewer_count', 0):,} |
+
+The test partition is assigned by a stable SHA-256 hash of normalized transcript and must remain excluded from model selection. This prevents duplicate-text leakage, but cannot prevent speaker leakage without speaker metadata.
+"""
+
+
+def run_ghana_nlp_audit():
+    ok, logs = run_command([PYTHON, "scripts/prepare_ghana_nlp.py"], timeout=1200)
+    return (
+        status_html(ok, "GhanaNLP metadata audit", str(GHANA_NLP_AUDIT.relative_to(ROOT))),
+        logs,
+        ghana_nlp_audit_summary(),
+    )
 
 
 def read_jsonl_preview(path: Path, limit: int = 3) -> str:
@@ -799,15 +839,19 @@ def training_plan() -> str:
     audit_ready = CORPUS_AUDIT.exists()
     decoder_ready = DECODER_ANALYSIS.exists()
     smoke_ready = SMOKE_SUMMARY.exists()
+    ghana_audit_ready = GHANA_NLP_AUDIT.exists()
+    ghana_smoke_ready = GHANA_SMOKE_SUMMARY.exists()
     return f"""
 <div class="ak-card">
-  <div class="ak-status">Waxal training gate</div>
-  <div class="ak-muted">The benchmark is frozen and excluded from training. A two-step smoke run must finish before the full L4 run is enabled.</div>
+  <div class="ak-status">Training gates</div>
+  <div class="ak-muted">Waxal promotion evidence and GhanaNLP preparation stay separate. Each arm requires an audit and a two-step smoke before a full L4 run.</div>
   <div class="ak-chiprow">
     <span class="ak-chip {'mint' if audit_ready else 'butter'}">corpus audit {'ready' if audit_ready else 'needed'}</span>
     <span class="ak-chip {'mint' if benchmark_ready else 'butter'}">99-row benchmark {'frozen' if benchmark_ready else 'needed'}</span>
     <span class="ak-chip {'mint' if decoder_ready else 'butter'}">decoder {'selected' if decoder_ready else 'needed'}</span>
     <span class="ak-chip {'mint' if smoke_ready else 'peach'}">smoke {'passed' if smoke_ready else 'pending'}</span>
+    <span class="ak-chip {'mint' if ghana_audit_ready else 'butter'}">GhanaNLP audit {'ready' if ghana_audit_ready else 'needed'}</span>
+    <span class="ak-chip {'mint' if ghana_smoke_ready else 'peach'}">GhanaNLP smoke {'passed' if ghana_smoke_ready else 'pending'}</span>
   </div>
 </div>
 """
@@ -845,6 +889,31 @@ The candidate improves WER by 0.97 points. A 5,000-sample paired bootstrap gives
 """
 
 
+def ghana_experiment_board() -> str:
+    if not GHANA_NLP_TEST_REPORT.exists():
+        return "_GhanaNLP held-out evaluation is not complete yet._"
+    report = json.loads(GHANA_NLP_TEST_REPORT.read_text(encoding="utf-8"))
+    baseline = report["runs"]["waxal_continuation_v1"]["metrics"]
+    candidate = report["runs"]["ghana_nlp_continuation_v1"]["metrics"]
+    waxal_result = "running"
+    if GHANA_WAXAL_TEST_REPORT.exists():
+        waxal_report = json.loads(GHANA_WAXAL_TEST_REPORT.read_text(encoding="utf-8"))
+        metrics = waxal_report["runs"]["ghana_nlp_continuation_v1"]["metrics"]
+        waxal_result = f"{metrics['wer'] * 100:.2f}% WER / {metrics['cer'] * 100:.2f}% CER"
+    return f"""
+### GhanaNLP-only experiment
+
+| Evidence | Before adaptation | GhanaNLP continuation |
+|---|---:|---:|
+| Validation, 602 rows | 165.53% WER | **84.58% WER** |
+| Untouched test, 571 rows | {baseline['wer'] * 100:.2f}% WER | **{candidate['wer'] * 100:.2f}% WER** |
+
+**Waxal regression check:** {waxal_result}
+
+This is a research checkpoint, not a release: the GhanaNLP test gain is large, but absolute WER remains too high and the public dataset does not expose speaker IDs.
+"""
+
+
 def sync_smoke_status():
     SMOKE_SUMMARY.parent.mkdir(parents=True, exist_ok=True)
     ok, logs = run_command(
@@ -872,6 +941,53 @@ def launch_smoke_training():
         ["modal", "run", "modal_jobs/asr_train.py", "--smoke"], timeout=1800
     )
     plan, status, sync_logs = sync_smoke_status()
+    if not ok:
+        status = status_html(False, "Smoke run failed", "Inspect the technical log before any full run.")
+    return plan, status, logs + "\n\n" + sync_logs
+
+
+def smoke_artifact(arm: str) -> tuple[str, Path, list[str]]:
+    if arm == "ghana_nlp_only":
+        return (
+            GHANA_SMOKE_RUN_NAME,
+            GHANA_SMOKE_SUMMARY,
+            ["modal", "run", "modal_jobs/asr_train.py", "--smoke", "--arm", arm],
+        )
+    return SMOKE_RUN_NAME, SMOKE_SUMMARY, ["modal", "run", "modal_jobs/asr_train.py", "--smoke"]
+
+
+def sync_selected_smoke(arm: str):
+    run_name, summary_path, _ = smoke_artifact(arm)
+    summary_path.parent.mkdir(parents=True, exist_ok=True)
+    ok, logs = run_command(
+        [
+            "modal",
+            "volume",
+            "get",
+            "akan-speech-checkpoints",
+            f"{run_name}/summary.json",
+            str(summary_path),
+        ],
+        timeout=60,
+    )
+    if not ok or not summary_path.exists():
+        return training_plan(), status_html(False, "Smoke run", "No completed summary yet."), logs
+    summary = json.loads(summary_path.read_text(encoding="utf-8"))
+    baseline = float(summary.get("baseline_metrics", {}).get("baseline_wer", 0)) * 100
+    final = float(summary.get("final_metrics", {}).get("final_wer", 0)) * 100
+    body = (
+        f"{run_name}: 2 steps completed on {summary.get('cuda', 'Modal GPU')} with "
+        f"{summary.get('train_rows', 0)} train, {summary.get('validation_rows', 0)} validation, "
+        f"and {summary.get('test_rows', 0)} untouched test rows. Validation WER "
+        f"{baseline:.2f}% → {final:.2f}%. Wiring evidence only."
+    )
+    return training_plan(), status_html(True, "Smoke run passed", body), logs
+
+
+def launch_selected_smoke(arm: str):
+    _, _, command = smoke_artifact(arm)
+    ok, logs = run_command(command, timeout=1800)
+    plan, status, sync_logs = sync_selected_smoke(arm)
     if not ok:
         status = status_html(False, "Smoke run failed", "Inspect the technical log before any full run.")
     return plan, status, logs + "\n\n" + sync_logs
@@ -995,6 +1111,17 @@ def build_app() -> gr.Blocks:
                     new_seed_btn.click(new_sample_seed, outputs=sample_seed)
                     sample_picker.change(selected_sample, inputs=sample_picker, outputs=[sample_audio, sample_details])
 
+                    gr.Markdown("## Audit GhanaNLP before training\nInspect every published row without downloading the 1.08 GB audio corpus. The audit freezes transcript-group partitions and surfaces limitations that affect evaluation credibility.")
+                    ghana_audit_btn = gr.Button("Audit all GhanaNLP metadata", variant="primary")
+                    ghana_audit_status = gr.HTML()
+                    ghana_audit_report = gr.Markdown(ghana_nlp_audit_summary())
+                    with gr.Accordion("GhanaNLP audit log", open=False):
+                        ghana_audit_logs = gr.Textbox(label="Audit log", lines=8, interactive=False)
+                    ghana_audit_btn.click(
+                        run_ghana_nlp_audit,
+                        outputs=[ghana_audit_status, ghana_audit_logs, ghana_audit_report],
+                    ).then(app_summary, outputs=state)
+
                 with gr.Tab("2 · Baseline"):
                     gr.Markdown("## Reproduce the existing model\nEvaluate the published Waxal fine-tune on the exact sample pack prepared in step 1. The Yoruba hint is retained as a baseline experiment, not assumed to be optimal Akan handling.")
                     model_id = gr.Dropdown(
@@ -1102,6 +1229,7 @@ def build_app() -> gr.Blocks:
                 with gr.Tab("3 · Train"):
                     train_gate = gr.HTML(training_plan())
                     gr.Markdown(benchmark_board())
+                    gr.Markdown(ghana_experiment_board())
                     gr.Markdown(
                         """
                         ### Candidate sequence
@@ -1110,11 +1238,20 @@ def build_app() -> gr.Blocks:
                         |---|---|---|
                         | From base | No language prefix, raw labels | Stopped at step 200: 88.88% validation WER |
                         | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Best at step 300: 31.45% validation WER |
+                        | GhanaNLP-only | Waxal continuation, GhanaNLP text-group split, `3e-6` | 99.35% GhanaNLP test WER; failed promotion after Waxal regressed to 37.80% |
 
                         Continuation improved the full validation split from 32.69% to 31.45% WER; step 400 regressed to 31.83%, so checkpoint 300 was selected. The full 1,522-row test improves from 33.84% to 32.77% with a paired interval below zero. Repetition collapse is now detected in evaluation; promotion remains locked pending Ghanaian listening review and validation of the guarded retry policy.
                         """
                     )
                     with gr.Row():
+                        smoke_arm = gr.Dropdown(
+                            choices=[
+                                ("Waxal baseline wiring", "from_base"),
+                                ("GhanaNLP-only wiring", "ghana_nlp_only"),
+                            ],
+                            value="ghana_nlp_only",
+                            label="Smoke arm",
+                        )
                         smoke_btn = gr.Button("Run 2-step Modal smoke", variant="primary")
                         smoke_refresh = gr.Button("Refresh smoke status", variant="secondary")
                     smoke_status = gr.HTML()
@@ -1125,11 +1262,13 @@ def build_app() -> gr.Blocks:
                         interactive=False,
                     )
                     smoke_btn.click(
-                        launch_smoke_training,
+                        launch_selected_smoke,
+                        inputs=smoke_arm,
                         outputs=[train_gate, smoke_status, smoke_logs],
                     )
                     smoke_refresh.click(
-                        sync_smoke_status,
+                        sync_selected_smoke,
+                        inputs=smoke_arm,
                         outputs=[train_gate, smoke_status, smoke_logs],
                     )
 

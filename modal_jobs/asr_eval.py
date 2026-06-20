@@ -183,6 +183,101 @@ def compare_full_test(models: list[dict], batch_size: int, report_name: str) -> 
     image=image,
     gpu="L4",
     cpu=4,
+    memory=32768,
+    volumes={
+        CACHE_DIR: cache_volume,
+        CHECKPOINT_DIR: checkpoint_volume,
+        OUTPUT_DIR: output_volume,
+    },
+    secrets=[modal.Secret.from_name("huggingface-token", required_keys=["HF_TOKEN"])],
+    timeout=2 * HOUR,
+    scaledown_window=30,
+)
+def compare_ghana_test(models: list[dict], batch_size: int, report_name: str) -> dict:
+    import time
+
+    import torch
+    from datasets import load_from_disk
+    from transformers import WhisperForConditionalGeneration, WhisperTokenizer
+
+    prepared_path = Path(CACHE_DIR) / "prepared" / (
+        "twi-speech-text-multispeaker-16k-default-"
+        "whisper-small-waxal-akan-continuation-v1-yoruba-clean-v1"
+    )
+    dataset = load_from_disk(str(prepared_path))["test"]
+    runs = {}
+    for model_spec in models:
+        started = time.perf_counter()
+        source = model_spec["source"]
+        tokenizer = WhisperTokenizer.from_pretrained(source, task="transcribe")
+        model = WhisperForConditionalGeneration.from_pretrained(
+            source, torch_dtype=torch.float16
+        ).to("cuda")
+        model.config.forced_decoder_ids = None
+        model.generation_config.forced_decoder_ids = None
+        model.generation_config.language = None
+        model.generation_config.task = "transcribe"
+        references = []
+        predictions = []
+        rows = []
+        for start in range(0, len(dataset), batch_size):
+            batch = dataset[start : start + batch_size]
+            input_features = torch.tensor(
+                batch["input_features"], dtype=torch.float16, device="cuda"
+            )
+            attention_mask = torch.tensor(
+                batch["attention_mask"], dtype=torch.long, device="cuda"
+            )
+            with torch.inference_mode():
+                generated = model.generate(
+                    input_features=input_features,
+                    attention_mask=attention_mask,
+                    task="transcribe",
+                )
+            batch_predictions = tokenizer.batch_decode(generated, skip_special_tokens=True)
+            batch_references = tokenizer.batch_decode(batch["labels"], skip_special_tokens=True)
+            for offset, (reference, prediction) in enumerate(
+                zip(batch_references, batch_predictions, strict=True)
+            ):
+                index = start + offset
+                reference = str(reference).strip()
+                prediction = str(prediction).strip()
+                references.append(reference)
+                predictions.append(prediction)
+                rows.append(
+                    {
+                        "idx": index,
+                        "reference": reference,
+                        "prediction": prediction,
+                        **error_rates([reference], [prediction]),
+                    }
+                )
+            print(f"{model_spec['name']}: {min(start + batch_size, len(dataset))}/{len(dataset)}")
+        runs[model_spec["name"]] = {
+            "model_id": model_spec["model_id"],
+            "runtime_seconds": round(time.perf_counter() - started, 3),
+            "rows": len(rows),
+            "metrics": error_rates(references, predictions),
+            "predictions": rows,
+        }
+        del model
+        torch.cuda.empty_cache()
+
+    result = {
+        "dataset": "ghananlpcommunity/twi-speech-text-multispeaker-16k/test-by-text-group",
+        "rows": len(dataset),
+        "runs": runs,
+    }
+    result_path = Path(OUTPUT_DIR) / report_name
+    result_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+    output_volume.commit()
+    return result
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=4,
     memory=16384,
     volumes={
         CACHE_DIR: cache_volume,
@@ -296,7 +391,50 @@ def main(
     batch_size: int = 4,
     strategies: str = "no_forced_language,yoruba,english",
     full_test: bool = False,
+    ghana_test: bool = False,
+    ghana_waxal_test: bool = False,
 ):
+    if ghana_test:
+        models = [
+            {
+                "name": "waxal_continuation_v1",
+                "model_id": "teckedd/whisper-small-waxal-akan-continuation-v1",
+                "source": "teckedd/whisper-small-waxal-akan-continuation-v1",
+            },
+            {
+                "name": "ghana_nlp_continuation_v1",
+                "model_id": "whisper-small-ghana-nlp-continued-v1",
+                "source": f"{CHECKPOINT_DIR}/whisper-small-ghana-nlp-continued-v1/final",
+            },
+        ]
+        result = compare_ghana_test.remote(models, batch_size, Path(output).name)
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+        print(
+            json.dumps(
+                {name: run["metrics"] for name, run in result["runs"].items()}, indent=2
+            )
+        )
+        print(f"Wrote {path}")
+        return
+    if ghana_waxal_test:
+        print("Preparing the cached Waxal test split on CPU...")
+        print(json.dumps(prepare_waxal_test.remote(), indent=2))
+        models = [
+            {
+                "name": "ghana_nlp_continuation_v1",
+                "model_id": "whisper-small-ghana-nlp-continued-v1",
+                "source": f"{CHECKPOINT_DIR}/whisper-small-ghana-nlp-continued-v1/final",
+            }
+        ]
+        result = compare_full_test.remote(models, batch_size, Path(output).name)
+        path = Path(output)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+        print(json.dumps(result["runs"]["ghana_nlp_continuation_v1"]["metrics"], indent=2))
+        print(f"Wrote {path}")
+        return
     if full_test:
         print("Preparing the full Waxal test split on CPU...")
         print(json.dumps(prepare_waxal_test.remote(), indent=2))

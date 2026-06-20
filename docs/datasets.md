@@ -24,6 +24,13 @@ python scripts/prepare_waxal.py \
 - Dataset: `ghananlpcommunity/twi-speech-text-multispeaker-16k`
 - Purpose: controlled Twi-specific ASR training and cross-dataset evaluation.
 - Rule: run GhanaNLP-only experiments before mixing with Waxal.
+- Current Dataset Viewer: 15,560 rows in one train split; the card text says 21,138.
+- Usable transcripts after empty-text filtering: 15,372 / 9.51 hours.
+- Existing 0.4-30 second training window: 11,830 eligible; 3,542 clips are shorter than 0.4 seconds.
+- Published columns: audio, text, duration. No speaker IDs are exposed, so speaker-safe evaluation cannot be claimed.
+- Frozen split: normalized-transcript group hash, 90/5/5. This keeps all 1,057 duplicate transcript groups within one partition and yields zero cross-split transcript leakage.
+
+The manifest stores stable `hf://dataset/config/split/row` references rather than expiring Dataset Viewer audio URLs. The split is suitable for a first controlled experiment, but the lack of speaker IDs remains a serious evaluation limitation.
 
 ## Candidate Supplemental Sources
 

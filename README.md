@@ -73,8 +73,11 @@ The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`. On this rep
 
 The first evidence-driven continuation run improved the complete 1,123-row validation split from **32.69% to 31.45% WER** at step 300. Step 400 regressed to 31.83%. On all 1,522 held-out Waxal test rows, the selected checkpoint improves **33.84% to 32.77% WER** and **12.74% to 12.47% CER**. A 5,000-sample paired bootstrap gives 99.86% probability of improvement and a -1.90 to -0.33 point 95% WER-difference interval. The [experimental candidate](https://huggingface.co/teckedd/whisper-small-waxal-akan-continuation-v1) remains gated because two outputs entered severe repetition loops and Ghanaian listening review is pending.
 
+The first GhanaNLP-only adaptation reduced held-out GhanaNLP WER from **160.65% to 99.35%**, but regressed the complete Waxal test from **32.77% to 37.80%**. It is retained as a failed-promotion experiment, not published as a model. The next ASR round must use Waxal replay or an adapter to control forgetting.
+
 ## Key Docs
 
+- [Roadmap and handoff](docs/ROADMAP.md)
 - [Dataset plan](docs/datasets.md)
 - [Preprocessing strategy](docs/preprocessing.md)
 - [Experiment plan](docs/experiments.md)

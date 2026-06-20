@@ -21,6 +21,16 @@ Baseline comparisons:
 - MMS ASR.
 - New GhanaNLP-only run.
 
+For the GhanaNLP continuation, evaluate the untouched transcript-group test partition directly from the prepared feature cache:
+
+```bash
+modal run modal_jobs/asr_eval.py \
+  --ghana-test \
+  --output evals/reports/ghana-nlp-test-continuation-v1.json
+```
+
+Then rerun the complete Waxal test with the GhanaNLP checkpoint added as a candidate. A GhanaNLP gain is not promotable if it causes material Waxal regression or repetition collapse.
+
 Promotion rule:
 
 - Do not push a new “best” model unless it improves held-out WER and gives clearly better qualitative Akan output without regressions.
