@@ -78,6 +78,7 @@ The first GhanaNLP-only adaptation reduced held-out GhanaNLP WER from **160.65% 
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
+- [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)
 - [Preprocessing strategy](docs/preprocessing.md)
 - [Experiment plan](docs/experiments.md)

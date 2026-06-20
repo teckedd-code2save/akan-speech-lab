@@ -81,6 +81,8 @@ If GhanaNLP improves its own test but damages Waxal heavily, use mixed replay or
 
 ## Next ASR Round
 
+Canonical specification: [ASR Round 2](ASR_ROUND2_SPEC.md).
+
 1. Build error buckets: short clips, long clips, repeated transcripts, dialect markers, English/code-switching, and named entities.
 2. Decide whether sub-0.4-second clips are useful keyword data or noise; do not mix them into sentence ASR by default.
 3. Run one controlled anti-forgetting experiment:
