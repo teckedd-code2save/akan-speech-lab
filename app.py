@@ -25,6 +25,8 @@ GHANA_NLP_MANIFEST = ROOT / "data/manifests/ghana_nlp_twi.jsonl"
 GHANA_NLP_AUDIT = REPORTS_DIR / "ghana_nlp_corpus_audit.json"
 GHANA_NLP_TEST_REPORT = REPORTS_DIR / "ghana-nlp-test-continuation-v1.json"
 GHANA_WAXAL_TEST_REPORT = REPORTS_DIR / "waxal-test-ghana-nlp-continuation-v1.json"
+ROUND2_SPLIT_AUDIT = REPORTS_DIR / "waxal_round2_split_audit.json"
+ROUND2_JOB_STATE = ROOT / "outputs/modal_jobs/asr_round2.json"
 DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
 SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
 SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
@@ -857,6 +859,78 @@ def training_plan() -> str:
 """
 
 
+def round2_training_board() -> str:
+    split_audit = {}
+    if ROUND2_SPLIT_AUDIT.exists():
+        split_audit = json.loads(ROUND2_SPLIT_AUDIT.read_text(encoding="utf-8"))
+    state = {"deployment": "unknown", "jobs": {}}
+    if ROUND2_JOB_STATE.exists():
+        state = json.loads(ROUND2_JOB_STATE.read_text(encoding="utf-8"))
+    jobs = state.get("jobs", {})
+
+    def job_status(key: str) -> str:
+        job = jobs.get(key) or {}
+        status = job.get("status", "not started")
+        call_id = job.get("call_id")
+        return f"{status}{f' · {call_id}' if call_id else ''}"
+
+    rows = split_audit.get("rows", {})
+    speakers = split_audit.get("speakers", {})
+    return f"""
+<div class="ak-card">
+  <div class="ak-status">Round 2 · contamination-safe Waxal</div>
+  <div class="ak-muted">One deployed scale-to-zero runner. Jobs persist if this UI disconnects; saved call IDs reconnect status without spawning duplicates.</div>
+  <div class="ak-chiprow">
+    <span class="ak-chip {'mint' if split_audit.get('passed') else 'butter'}">metadata {'passed' if split_audit.get('passed') else 'needed'}</span>
+    <span class="ak-chip {'mint' if state.get('deployment') == 'ready' else 'butter'}">runner {state.get('deployment', 'unknown')}</span>
+    <span class="ak-chip sky">prepare {jobs.get('prepare', {}).get('status', 'not started')}</span>
+    <span class="ak-chip peach">smoke {jobs.get('train_smoke', {}).get('status', 'not started')}</span>
+    <span class="ak-chip rose">pilot {jobs.get('train_pilot', {}).get('status', 'locked')}</span>
+  </div>
+</div>
+
+| Gate | Evidence |
+|---|---|
+| Frozen split | {rows.get('train', 0):,} train / {rows.get('dev', 0):,} dev / {rows.get('test', 0):,} test |
+| Speaker isolation | {speakers.get('train', 0)} / {speakers.get('dev', 0)} / {speakers.get('test', 0)} speakers; zero overlap |
+| Deployed runner | `{state.get('deployment', 'unknown')}` |
+| CPU audio audit | {job_status('prepare')} |
+| Two-step smoke | {job_status('train_smoke')} |
+| 200-step pilot | {job_status('train_pilot')} |
+"""
+
+
+def run_round2_action(action: str):
+    commands = {
+        "deploy": [PYTHON, "scripts/modal_round2_jobs.py", "deploy"],
+        "prepare": [PYTHON, "scripts/modal_round2_jobs.py", "prepare"],
+        "smoke": [PYTHON, "scripts/modal_round2_jobs.py", "train", "--mode", "smoke"],
+        "pilot": [PYTHON, "scripts/modal_round2_jobs.py", "train", "--mode", "pilot"],
+        "refresh": [PYTHON, "scripts/modal_round2_jobs.py", "status"],
+    }
+    if action not in commands:
+        raise ValueError(f"Unsupported Round 2 action: {action}")
+    ok, output = run_command(commands[action], timeout=600)
+    detail = "Action accepted." if ok else output.splitlines()[-1] if output else "Action failed."
+    return round2_training_board(), status_html(ok, f"Round 2 {action}", detail)
+
+
+def cancel_round2_job():
+    state = json.loads(ROUND2_JOB_STATE.read_text()) if ROUND2_JOB_STATE.exists() else {}
+    jobs = state.get("jobs", {})
+    active = next(
+        (key for key, job in reversed(list(jobs.items())) if job.get("status") in {"submitted", "running"}),
+        None,
+    )
+    if not active:
+        return round2_training_board(), status_html(False, "Round 2 cancel", "No active job.")
+    ok, output = run_command(
+        [PYTHON, "scripts/modal_round2_jobs.py", "cancel", active], timeout=60
+    )
+    detail = f"Cancelled {active}." if ok else output.splitlines()[-1]
+    return round2_training_board(), status_html(ok, "Round 2 cancel", detail)
+
+
 def benchmark_board() -> str:
     if not DECODER_ANALYSIS.exists():
         return "_Run the frozen benchmark before selecting a decoder strategy._"
@@ -1227,50 +1301,48 @@ def build_app() -> gr.Blocks:
                     )
 
                 with gr.Tab("3 · Train"):
-                    train_gate = gr.HTML(training_plan())
-                    gr.Markdown(benchmark_board())
-                    gr.Markdown(ghana_experiment_board())
-                    gr.Markdown(
-                        """
-                        ### Candidate sequence
-
-                        | Arm | Configuration | Result |
-                        |---|---|---|
-                        | From base | No language prefix, raw labels | Stopped at step 200: 88.88% validation WER |
-                        | Continuation | Published Waxal model, Yoruba training prefix, cleaned labels, `5e-6` | Best at step 300: 31.45% validation WER |
-                        | GhanaNLP-only | Waxal continuation, GhanaNLP text-group split, `3e-6` | 99.35% GhanaNLP test WER; failed promotion after Waxal regressed to 37.80% |
-
-                        Continuation improved the full validation split from 32.69% to 31.45% WER; step 400 regressed to 31.83%, so checkpoint 300 was selected. The full 1,522-row test improves from 33.84% to 32.77% with a paired interval below zero. Repetition collapse is now detected in evaluation; promotion remains locked pending Ghanaian listening review and validation of the guarded retry policy.
-                        """
-                    )
+                    round2_board = gr.Markdown(round2_training_board())
+                    round2_status = gr.HTML()
                     with gr.Row():
-                        smoke_arm = gr.Dropdown(
-                            choices=[
-                                ("Waxal baseline wiring", "from_base"),
-                                ("GhanaNLP-only wiring", "ghana_nlp_only"),
-                            ],
-                            value="ghana_nlp_only",
-                            label="Smoke arm",
+                        deploy_round2 = gr.Button("Deploy runner", variant="secondary")
+                        prepare_round2 = gr.Button("Prepare + audit", variant="primary")
+                        smoke_round2 = gr.Button("Run 2-step smoke", variant="primary")
+                        pilot_round2 = gr.Button("Run 200-step pilot", variant="secondary")
+                        refresh_round2 = gr.Button("Refresh", variant="secondary")
+                        cancel_round2 = gr.Button("Cancel active", variant="stop")
+                    deploy_round2.click(
+                        lambda: run_round2_action("deploy"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    prepare_round2.click(
+                        lambda: run_round2_action("prepare"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    smoke_round2.click(
+                        lambda: run_round2_action("smoke"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    pilot_round2.click(
+                        lambda: run_round2_action("pilot"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    refresh_round2.click(
+                        lambda: run_round2_action("refresh"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    cancel_round2.click(
+                        cancel_round2_job,
+                        outputs=[round2_board, round2_status],
+                    )
+
+                    with gr.Accordion("Previous experiments", open=False):
+                        gr.HTML(training_plan())
+                        gr.Markdown(benchmark_board())
+                        gr.Markdown(ghana_experiment_board())
+                        gr.Markdown(
+                            "Waxal continuation remains the current benchmark at 32.77% test WER. "
+                            "The GhanaNLP-only checkpoint failed promotion after Waxal regressed to 37.80%."
                         )
-                        smoke_btn = gr.Button("Run 2-step Modal smoke", variant="primary")
-                        smoke_refresh = gr.Button("Refresh smoke status", variant="secondary")
-                    smoke_status = gr.HTML()
-                    with gr.Accordion("Technical log", open=False):
-                        smoke_logs = gr.Textbox(label="Modal log", lines=10, interactive=False)
-                    gr.Button(
-                        "Promotion locked: listening review + guarded retry validation",
-                        interactive=False,
-                    )
-                    smoke_btn.click(
-                        launch_selected_smoke,
-                        inputs=smoke_arm,
-                        outputs=[train_gate, smoke_status, smoke_logs],
-                    )
-                    smoke_refresh.click(
-                        sync_selected_smoke,
-                        inputs=smoke_arm,
-                        outputs=[train_gate, smoke_status, smoke_logs],
-                    )
 
                 with gr.Tab("4 · Compare"):
                     compare_board = gr.Markdown(comparison_board())

@@ -14,6 +14,7 @@ dependencies = [
   "gradio>=5.49,<6",
   "jiwer>=3.0.4",
   "librosa>=0.10.2",
+  "modal>=1.4,<1.5",
   "numpy>=1.26.0",
   "pandas>=2.2.0",
   "soundfile>=0.12.1",

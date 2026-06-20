@@ -1,11 +1,34 @@
 # Modal Usage
 
-Modal is for GPU-bound training and evaluation only.
+Modal is used for CPU audio preparation and GPU-bound training/evaluation.
+
+## Round 2 Durable Jobs
+
+Round 2 does not use an attached `modal run` process. The pipeline follows Modal's deployed job-processing pattern:
+
+1. Deploy `akan-speech-asr-round2` once.
+2. Resolve deployed functions with `modal.Function.from_name`.
+3. Submit with `.spawn()` and persist the returned `fc-...` call ID.
+4. Poll later with `modal.FunctionCall.from_id(call_id).get(timeout=0)`.
+5. Reject duplicate submissions while an existing call is submitted, running, or complete.
+
+Deployed functions scale to zero by default, so deployment does not keep paid containers warm. Job state is stored in `outputs/modal_jobs/asr_round2.json`; datasets and checkpoints remain in Modal Volumes.
+
+```bash
+python scripts/modal_round2_jobs.py deploy
+python scripts/modal_round2_jobs.py prepare
+python scripts/modal_round2_jobs.py status
+python scripts/modal_round2_jobs.py train --mode smoke
+python scripts/modal_round2_jobs.py train --mode pilot
+python scripts/modal_round2_jobs.py cancel train_pilot
+```
+
+Preparation and training have bounded retries. Training automatically resumes from the newest persisted checkpoint and returns an existing completed summary instead of repeating work.
 
 ## Rules
 
 - Validate manifests locally before running GPU jobs.
-- Use `scaledown_window=60` or similarly short idle windows.
+- Use `scaledown_window=30` for GPU jobs.
 - Prefer one-shot jobs over always-on services.
 - Log model ID, dataset manifest, sample count, runtime, and cost notes.
 - Stop or let jobs scale down after each run.
@@ -16,9 +39,11 @@ Modal is for GPU-bound training and evaluation only.
 - `akan-speech-checkpoints`: smoke summaries, checkpoints, and final model
 - `akan-speech-eval-results`: durable benchmark reports
 
-No ASR training web service is deployed. Each job is one-shot and the L4 scales to zero when the command exits.
+The Round 2 app is deployed as a persistent function namespace, not an always-on web server. CPU and GPU containers still scale to zero when no call is active.
 
-## Commands
+## Legacy Commands (Do Not Use For Round 2)
+
+The commands below document older experiments only. They create attached or ephemeral app runs and are intentionally excluded from the Round 2 execution path.
 
 ```bash
 modal run modal_jobs/asr_train.py --smoke

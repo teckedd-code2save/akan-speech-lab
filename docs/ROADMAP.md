@@ -6,7 +6,7 @@ Last updated: 2026-06-20
 
 Build commercially usable Akan speech infrastructure for health, ecommerce, support, and voice-agent products. The lab must improve ASR and TTS through reproducible data preparation, frozen evaluation sets, controlled training experiments, Ghanaian listening review, and explicit licensing.
 
-The current work is **ASR round 1**. TTS training has not started.
+The current work is **ASR round 2**. TTS training has not started.
 
 ## Current Position
 
@@ -83,13 +83,30 @@ If GhanaNLP improves its own test but damages Waxal heavily, use mixed replay or
 
 Canonical specification: [ASR Round 2](ASR_ROUND2_SPEC.md).
 
-1. Build error buckets: short clips, long clips, repeated transcripts, dialect markers, English/code-switching, and named entities.
-2. Decide whether sub-0.4-second clips are useful keyword data or noise; do not mix them into sentence ASR by default.
-3. Run one controlled anti-forgetting experiment:
-   - GhanaNLP plus a small Waxal replay buffer, or
-   - a GhanaNLP LoRA/adapter with the Waxal model preserved.
-4. Compare Whisper small against one stronger multilingual ASR family only after the evaluation harness is fixed.
-5. Promote only on multi-corpus evidence and Ghanaian listening review.
+Implementation status:
+
+- pinned Waxal metadata revision and speaker-component split: complete
+- metadata contamination assertions: passed
+- deployed scale-to-zero Modal runner: complete
+- decoded-audio quality and contamination audit: passed
+- durable prepared dataset: 9,133 train / 2,091 dev / 1,522 test
+- two-step L4 smoke with SpecAugment, eval, checkpoint, and resume artifacts: passed
+- 200-step pilot: ready, not submitted
+
+Round 2 audit details:
+
+- speaker overlap: zero across train, dev, and test
+- normalized-transcript overlap: zero across train, dev, and test
+- decoded-audio overlap: zero after quarantining one train copy duplicated in dev
+- removed before training: one out-of-range train clip, three duplicate train clips, and one duplicate dev clip
+- preparation call: `fc-01KVJW2D1MC677XZ1GTV957PDY`
+- smoke call: `fc-01KVJW5QZMZE0ZYFZPMJ1PBYH7`
+
+1. Run the 200-step Waxal-only pilot and inspect unseen-speaker dev WER plus predictions.
+2. Continue to the full 2,000-step run only if the pilot is stable and improves the frozen dev baseline.
+3. Evaluate the selected checkpoint once on the immutable 1,522-row Waxal test.
+4. Build error buckets: duration, dialect markers, English/code-switching, names, and repetition.
+5. Promote only if test WER beats 30.86% and Ghanaian listening review confirms the gain.
 
 ## TTS Roadmap
 
@@ -105,16 +122,18 @@ TTS starts after ASR round 1 is closed:
 ## Cost and Operations
 
 - Modal dataset preparation runs on CPU before L4 allocation.
-- Smoke tests use 2 steps and arm-specific output directories.
-- Checkpoints save every 100 steps and persist to `akan-speech-checkpoints`.
-- Training can resume with `--resume-step N`; do not restart completed steps.
-- Evaluation apps use `scaledown_window=30` and stop after completion.
+- Smoke tests use 2 steps and isolated output directories.
+- Pilot/full checkpoints persist to `akan-speech-checkpoints`; the newest checkpoint resumes automatically.
+- Round 2 is a named deployment submitted with `.spawn()` and persisted call IDs, not an attached `modal run` process.
+- GPU functions use `scaledown_window=30`, `max_containers=1`, and bounded retries.
 - Before ending a session, run `modal app list` and confirm no Akan Speech Lab task is active.
 
 ## Artifact Map
 
 - Gradio UI: `app.py`
-- Training: `modal_jobs/asr_train.py`
+- Round 2 training: `modal_jobs/asr_round2.py`
+- Durable job controller: `scripts/modal_round2_jobs.py`
+- Frozen split builder: `scripts/build_waxal_round2_manifest.py`
 - Evaluation: `modal_jobs/asr_eval.py`
 - GhanaNLP metadata prep: `scripts/prepare_ghana_nlp.py`
 - Frozen/evaluation reports: `evals/reports/` (large JSON files are gitignored)
@@ -125,38 +144,22 @@ TTS starts after ASR round 1 is closed:
 
 ## Resume Commands
 
-Refresh the GhanaNLP training summary:
+Inspect the durable Round 2 state:
 
 ```bash
-modal volume get akan-speech-checkpoints \
-  whisper-small-ghana-nlp-continued-v1/summary.json \
-  outputs/modal/whisper-small-ghana-nlp-continued-v1/summary.json
+.venv/bin/python scripts/modal_round2_jobs.py status
 ```
 
-Evaluate the untouched GhanaNLP test:
+Submit the gated pilot only after reviewing the passed smoke:
 
 ```bash
-modal run modal_jobs/asr_eval.py \
-  --ghana-test \
-  --batch-size 8 \
-  --output evals/reports/ghana-nlp-test-continuation-v1.json
+.venv/bin/python scripts/modal_round2_jobs.py train --mode pilot
 ```
 
-Measure Waxal regression without rerunning existing baselines:
+Cancel a submitted pilot without depending on a local terminal heartbeat:
 
 ```bash
-modal run modal_jobs/asr_eval.py \
-  --ghana-waxal-test \
-  --batch-size 8 \
-  --output evals/reports/waxal-test-ghana-nlp-continuation-v1.json
-```
-
-Resume interrupted training only from a persisted checkpoint:
-
-```bash
-modal run modal_jobs/asr_train.py \
-  --arm ghana_nlp_only \
-  --resume-step 100
+.venv/bin/python scripts/modal_round2_jobs.py cancel train_pilot
 ```
 
 Run the local lab:
