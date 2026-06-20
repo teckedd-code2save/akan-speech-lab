@@ -179,6 +179,31 @@ def submit_training(mode: str) -> dict[str, Any]:
     return job
 
 
+def submit_test_evaluation() -> dict[str, Any]:
+    state = refresh()
+    full = state.get("jobs", {}).get("train_full") or {}
+    if full.get("status") != "complete":
+        raise RuntimeError("Full training must complete before immutable test evaluation.")
+    result = full.get("result") or {}
+    if not result.get("best_checkpoint") or not (result.get("final_metrics") or {}).get("final_wer"):
+        raise RuntimeError("Full training result is missing its selected checkpoint or dev WER.")
+    existing = state.get("jobs", {}).get("evaluate_test")
+    if existing and existing.get("status") in {"submitted", "running", "complete"}:
+        return existing
+    config = config_for("full")
+    call = deployed_function("evaluate_round2_test").spawn(asdict(config))
+    job = {
+        "kind": "evaluate_test",
+        "call_id": call.object_id,
+        "status": "submitted",
+        "submitted_at": now(),
+        "config": asdict(config),
+    }
+    state.setdefault("jobs", {})["evaluate_test"] = job
+    save_state(state)
+    return job
+
+
 def cancel(key: str) -> dict[str, Any]:
     state = refresh()
     job = state.get("jobs", {}).get(key)
@@ -201,6 +226,7 @@ def main() -> None:
     train_parser = subparsers.add_parser("train")
     train_parser.add_argument("--mode", choices=["smoke", "pilot", "full"], required=True)
     subparsers.add_parser("status")
+    subparsers.add_parser("evaluate-test")
     cancel_parser = subparsers.add_parser("cancel")
     cancel_parser.add_argument("job_key")
     args = parser.parse_args()
@@ -213,6 +239,8 @@ def main() -> None:
         result = submit_training(args.mode)
     elif args.action == "cancel":
         result = cancel(args.job_key)
+    elif args.action == "evaluate-test":
+        result = submit_test_evaluation()
     else:
         result = refresh()
     print(json.dumps(result, indent=2, default=str))

@@ -20,10 +20,13 @@ python scripts/modal_round2_jobs.py prepare
 python scripts/modal_round2_jobs.py status
 python scripts/modal_round2_jobs.py train --mode smoke
 python scripts/modal_round2_jobs.py train --mode pilot
+python scripts/modal_round2_jobs.py train --mode full
+python scripts/modal_round2_jobs.py evaluate-test
 python scripts/modal_round2_jobs.py cancel train_pilot
 ```
 
 Preparation and training have bounded retries. Training automatically resumes from the newest persisted checkpoint and returns an existing completed summary instead of repeating work.
+The immutable test action requires a completed full run and writes a durable marker; later calls return the stored summary instead of decoding the test again.
 
 ## Rules
 

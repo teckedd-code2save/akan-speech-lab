@@ -10,6 +10,7 @@ import modal
 HOUR = 60 * 60
 CACHE_DIR = "/cache"
 OUTPUT_DIR = "/outputs"
+EVAL_DIR = "/eval-results"
 MANIFEST_DIR = Path("/round2_manifests")
 APP_NAME = "akan-speech-asr-round2"
 PARQUET_REVISION = "fe897206a41cad1b26f39f4c4088a45538ccfced"
@@ -17,6 +18,7 @@ PARQUET_REVISION = "fe897206a41cad1b26f39f4c4088a45538ccfced"
 app = modal.App(APP_NAME)
 cache_volume = modal.Volume.from_name("akan-speech-hf-cache", create_if_missing=True)
 output_volume = modal.Volume.from_name("akan-speech-checkpoints", create_if_missing=True)
+eval_volume = modal.Volume.from_name("akan-speech-eval-results", create_if_missing=True)
 
 image = (
     modal.Image.debian_slim(python_version="3.12")
@@ -541,4 +543,264 @@ def train_round2(config_dict: dict) -> dict:
     }
     summary_path.write_text(json.dumps(summary, indent=2, default=str) + "\n")
     output_volume.commit()
+    return summary
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=8,
+    memory=32768,
+    volumes={
+        CACHE_DIR: cache_volume,
+        OUTPUT_DIR: output_volume,
+        EVAL_DIR: eval_volume,
+    },
+    secrets=[modal.Secret.from_name("huggingface-token", required_keys=["HF_TOKEN"])],
+    timeout=6 * HOUR,
+    retries=modal.Retries(max_retries=1, backoff_coefficient=2.0, initial_delay=10.0),
+    scaledown_window=30,
+    max_containers=1,
+)
+def evaluate_round2_test(config_dict: dict) -> dict:
+    import random
+    import time
+    from collections import defaultdict
+
+    import numpy as np
+    import torch
+    from datasets import load_from_disk
+    from jiwer import process_characters, process_words
+    from transformers import WhisperForConditionalGeneration, WhisperTokenizer
+
+    config = Round2Config(**config_dict)
+    run_dir = Path(OUTPUT_DIR) / config.run_name
+    training_summary_path = run_dir / "summary.json"
+    if not training_summary_path.exists():
+        raise RuntimeError("Completed full training summary is required before test evaluation")
+    training_summary = json.loads(training_summary_path.read_text())
+    if training_summary.get("status") != "complete":
+        raise RuntimeError("Full training is not complete")
+    best_checkpoint = Path(training_summary["best_checkpoint"])
+    if not best_checkpoint.exists():
+        raise RuntimeError(f"Selected checkpoint is unavailable: {best_checkpoint}")
+
+    report_path = Path(EVAL_DIR) / "waxal-round2-immutable-test-v1.json"
+    marker_path = Path(EVAL_DIR) / "waxal-round2-immutable-test-v1.summary.json"
+    if marker_path.exists() and report_path.exists():
+        return json.loads(marker_path.read_text())
+
+    prepared = load_from_disk(str(prepared_dataset_path(config)))
+    test = prepared["test"]
+    references = [str(text) for text in test["normalized_text"]]
+
+    def rates(refs, preds):
+        words = process_words(refs, preds)
+        chars = process_characters(refs, preds)
+        return {
+            "wer": float(words.wer),
+            "cer": float(chars.cer),
+            "reference_words": int(words.hits + words.substitutions + words.deletions),
+            "hits": int(words.hits),
+            "substitutions": int(words.substitutions),
+            "deletions": int(words.deletions),
+            "insertions": int(words.insertions),
+        }
+
+    def duration_bucket(seconds):
+        if seconds < 1:
+            return "under_1s"
+        if seconds < 3:
+            return "1s_to_3s"
+        if seconds < 10:
+            return "3s_to_10s"
+        if seconds < 20:
+            return "10s_to_20s"
+        return "over_20s"
+
+    def repetition_collapse(text):
+        tokens = text.split()
+        longest = current = 0
+        previous = None
+        for token in tokens:
+            current = current + 1 if token == previous else 1
+            longest = max(longest, current)
+            previous = token
+        return longest >= 5
+
+    def grouped(rows, field):
+        groups = defaultdict(list)
+        for row in rows:
+            key = duration_bucket(row["duration_seconds"]) if field == "duration" else row[field]
+            groups[str(key)].append(row)
+        return {
+            key: {
+                "rows": len(group_rows),
+                **rates(
+                    [row["reference"] for row in group_rows],
+                    [row["prediction"] for row in group_rows],
+                ),
+            }
+            for key, group_rows in sorted(groups.items())
+        }
+
+    model_specs = [
+        {
+            "name": "original_waxal",
+            "model_id": "teckedd/whisper_small-waxal_akan-asr-v1",
+            "source": "teckedd/whisper_small-waxal_akan-asr-v1",
+        },
+        {
+            "name": "continuation_v1",
+            "model_id": "teckedd/whisper-small-waxal-akan-continuation-v1",
+            "source": "teckedd/whisper-small-waxal-akan-continuation-v1",
+        },
+        {
+            "name": "round2",
+            "model_id": f"{config.run_name}@checkpoint-1200",
+            "source": str(best_checkpoint),
+        },
+    ]
+    runs = {}
+    tokenizer = WhisperTokenizer.from_pretrained(config.base_model, task="transcribe")
+    for model_spec in model_specs:
+        started = time.perf_counter()
+        model = WhisperForConditionalGeneration.from_pretrained(
+            model_spec["source"], torch_dtype=torch.float16
+        ).to("cuda")
+        model.config.forced_decoder_ids = None
+        model.generation_config.forced_decoder_ids = None
+        model.generation_config.language = None
+        model.generation_config.task = "transcribe"
+        predictions = []
+        rows = []
+        batch_size = 8
+        for start in range(0, len(test), batch_size):
+            batch = test[start : start + batch_size]
+            input_features = torch.tensor(
+                batch["input_features"], dtype=torch.float16, device="cuda"
+            )
+            attention_mask = torch.tensor(
+                batch["attention_mask"], dtype=torch.long, device="cuda"
+            )
+            with torch.inference_mode():
+                generated = model.generate(
+                    input_features=input_features,
+                    attention_mask=attention_mask,
+                    task="transcribe",
+                    max_length=config.generation_max_length,
+                    num_beams=1,
+                )
+            decoded = tokenizer.batch_decode(generated, skip_special_tokens=True)
+            for offset, prediction in enumerate(decoded):
+                index = start + offset
+                prediction = normalize_akan_text(prediction)
+                reference = references[index]
+                row_metrics = rates([reference], [prediction])
+                predictions.append(prediction)
+                rows.append(
+                    {
+                        "dataset_row": index,
+                        "sample_id": batch["sample_id"][offset],
+                        "speaker_id": str(batch["speaker_id"][offset]),
+                        "duration_seconds": float(batch["duration_seconds"][offset]),
+                        "reference": reference,
+                        "prediction": prediction,
+                        **row_metrics,
+                    }
+                )
+            print(f"{model_spec['name']}: {min(start + batch_size, len(test))}/{len(test)}")
+        repeated = sum(repetition_collapse(prediction) for prediction in predictions)
+        runs[model_spec["name"]] = {
+            "model_id": model_spec["model_id"],
+            "runtime_seconds": round(time.perf_counter() - started, 3),
+            "metrics": rates(references, predictions),
+            "repetition_collapses": int(repeated),
+            "speaker_metrics": grouped(rows, "speaker_id"),
+            "duration_metrics": grouped(rows, "duration"),
+            "predictions": rows,
+        }
+        del model
+        torch.cuda.empty_cache()
+
+    candidate_rows = runs["round2"]["predictions"]
+    comparisons = {}
+    for baseline_name in ("original_waxal", "continuation_v1"):
+        baseline_rows = runs[baseline_name]["predictions"]
+        baseline_counts = []
+        candidate_counts = []
+        row_differences = []
+        for baseline, candidate in zip(baseline_rows, candidate_rows, strict=True):
+            reference_words = baseline["reference_words"]
+            baseline_errors = sum(baseline[key] for key in ("substitutions", "deletions", "insertions"))
+            candidate_errors = sum(candidate[key] for key in ("substitutions", "deletions", "insertions"))
+            baseline_counts.append((baseline_errors, reference_words))
+            candidate_counts.append((candidate_errors, reference_words))
+            row_differences.append(
+                {
+                    "dataset_row": baseline["dataset_row"],
+                    "sample_id": baseline["sample_id"],
+                    "reference": baseline["reference"],
+                    "baseline_prediction": baseline["prediction"],
+                    "candidate_prediction": candidate["prediction"],
+                    "wer_difference": candidate["wer"] - baseline["wer"],
+                }
+            )
+        rng = random.Random(42)
+        differences = []
+        for _ in range(5000):
+            indices = [rng.randrange(len(candidate_rows)) for _ in candidate_rows]
+            reference_words = sum(baseline_counts[index][1] for index in indices)
+            baseline_wer = sum(baseline_counts[index][0] for index in indices) / reference_words
+            candidate_wer = sum(candidate_counts[index][0] for index in indices) / reference_words
+            differences.append(candidate_wer - baseline_wer)
+        low, median, high = np.percentile(differences, [2.5, 50, 97.5])
+        comparisons[baseline_name] = {
+            "paired_wer_difference": {
+                "low": float(low),
+                "median": float(median),
+                "high": float(high),
+                "probability_candidate_improves": float(
+                    sum(value < 0 for value in differences) / len(differences)
+                ),
+            },
+            "better_rows": sum(row["wer_difference"] < 0 for row in row_differences),
+            "tied_rows": sum(row["wer_difference"] == 0 for row in row_differences),
+            "worse_rows": sum(row["wer_difference"] > 0 for row in row_differences),
+            "largest_gains": sorted(row_differences, key=lambda row: row["wer_difference"])[:20],
+            "largest_regressions": sorted(
+                row_differences, key=lambda row: row["wer_difference"], reverse=True
+            )[:20],
+        }
+
+    result = {
+        "dataset": "google/WaxalNLP/aka_asr/test_v1",
+        "parquet_revision": PARQUET_REVISION,
+        "rows": len(test),
+        "selected_checkpoint": str(best_checkpoint),
+        "runs": runs,
+        "comparisons": comparisons,
+    }
+    report_path.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n")
+    summary = {
+        "status": "complete",
+        "report_path": str(report_path),
+        "dataset": result["dataset"],
+        "rows": len(test),
+        "selected_checkpoint": str(best_checkpoint),
+        "metrics": {name: run["metrics"] for name, run in runs.items()},
+        "repetition_collapses": {
+            name: run["repetition_collapses"] for name, run in runs.items()
+        },
+        "comparisons": {
+            name: {
+                key: value
+                for key, value in comparison.items()
+                if key not in {"largest_gains", "largest_regressions"}
+            }
+            for name, comparison in comparisons.items()
+        },
+    }
+    marker_path.write_text(json.dumps(summary, indent=2) + "\n")
+    eval_volume.commit()
     return summary

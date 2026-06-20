@@ -886,6 +886,8 @@ def round2_training_board() -> str:
     <span class="ak-chip sky">prepare {jobs.get('prepare', {}).get('status', 'not started')}</span>
     <span class="ak-chip peach">smoke {jobs.get('train_smoke', {}).get('status', 'not started')}</span>
     <span class="ak-chip rose">pilot {jobs.get('train_pilot', {}).get('status', 'locked')}</span>
+    <span class="ak-chip rose">full {jobs.get('train_full', {}).get('status', 'locked')}</span>
+    <span class="ak-chip sky">test {jobs.get('evaluate_test', {}).get('status', 'locked')}</span>
   </div>
 </div>
 
@@ -897,6 +899,8 @@ def round2_training_board() -> str:
 | CPU audio audit | {job_status('prepare')} |
 | Two-step smoke | {job_status('train_smoke')} |
 | 200-step pilot | {job_status('train_pilot')} |
+| Full training | {job_status('train_full')} |
+| Immutable test | {job_status('evaluate_test')} |
 """
 
 
@@ -906,6 +910,8 @@ def run_round2_action(action: str):
         "prepare": [PYTHON, "scripts/modal_round2_jobs.py", "prepare"],
         "smoke": [PYTHON, "scripts/modal_round2_jobs.py", "train", "--mode", "smoke"],
         "pilot": [PYTHON, "scripts/modal_round2_jobs.py", "train", "--mode", "pilot"],
+        "full": [PYTHON, "scripts/modal_round2_jobs.py", "train", "--mode", "full"],
+        "evaluate-test": [PYTHON, "scripts/modal_round2_jobs.py", "evaluate-test"],
         "refresh": [PYTHON, "scripts/modal_round2_jobs.py", "status"],
     }
     if action not in commands:
@@ -1308,6 +1314,8 @@ def build_app() -> gr.Blocks:
                         prepare_round2 = gr.Button("Prepare + audit", variant="primary")
                         smoke_round2 = gr.Button("Run 2-step smoke", variant="primary")
                         pilot_round2 = gr.Button("Run 200-step pilot", variant="secondary")
+                        full_round2 = gr.Button("Run full training", variant="secondary")
+                        test_round2 = gr.Button("Evaluate immutable test", variant="secondary")
                         refresh_round2 = gr.Button("Refresh", variant="secondary")
                         cancel_round2 = gr.Button("Cancel active", variant="stop")
                     deploy_round2.click(
@@ -1324,6 +1332,14 @@ def build_app() -> gr.Blocks:
                     )
                     pilot_round2.click(
                         lambda: run_round2_action("pilot"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    full_round2.click(
+                        lambda: run_round2_action("full"),
+                        outputs=[round2_board, round2_status],
+                    )
+                    test_round2.click(
+                        lambda: run_round2_action("evaluate-test"),
                         outputs=[round2_board, round2_status],
                     )
                     refresh_round2.click(
