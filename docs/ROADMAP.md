@@ -91,7 +91,8 @@ Implementation status:
 - decoded-audio quality and contamination audit: passed
 - durable prepared dataset: 9,133 train / 2,091 dev / 1,522 test
 - two-step L4 smoke with SpecAugment, eval, checkpoint, and resume artifacts: passed
-- 200-step pilot: ready, not submitted
+- 200-step pilot: passed; unseen-speaker dev WER 114.03% -> 43.93%
+- full 2,000-step run: unlocked by pilot gate
 
 Round 2 audit details:
 
@@ -101,12 +102,12 @@ Round 2 audit details:
 - removed before training: one out-of-range train clip, three duplicate train clips, and one duplicate dev clip
 - preparation call: `fc-01KVJW2D1MC677XZ1GTV957PDY`
 - smoke call: `fc-01KVJW5QZMZE0ZYFZPMJ1PBYH7`
+- pilot call: `fc-01KVJWJVRQAPQWDWZ81TMQSD1V`
 
-1. Run the 200-step Waxal-only pilot and inspect unseen-speaker dev WER plus predictions.
-2. Continue to the full 2,000-step run only if the pilot is stable and improves the frozen dev baseline.
-3. Evaluate the selected checkpoint once on the immutable 1,522-row Waxal test.
-4. Build error buckets: duration, dialect markers, English/code-switching, names, and repetition.
-5. Promote only if test WER beats 30.86% and Ghanaian listening review confirms the gain.
+1. Run the unlocked full 2,000-step training with evaluation every 200 steps and early stopping.
+2. Evaluate the selected checkpoint once on the immutable 1,522-row Waxal test.
+3. Build error buckets: duration, dialect markers, English/code-switching, names, and repetition.
+4. Promote only if test WER beats 30.86% and Ghanaian listening review confirms the gain.
 
 ## TTS Roadmap
 

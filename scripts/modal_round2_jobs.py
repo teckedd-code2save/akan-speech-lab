@@ -146,6 +146,20 @@ def submit_training(mode: str) -> dict[str, Any]:
     result = preparation.get("result") or {}
     if not result.get("passed"):
         raise RuntimeError("Round 2 contamination audit did not pass; GPU submission is blocked.")
+    if mode == "full":
+        pilot = state.get("jobs", {}).get("train_pilot") or {}
+        pilot_result = pilot.get("result") or {}
+        baseline_wer = (pilot_result.get("baseline_metrics") or {}).get("baseline_wer")
+        final_wer = (pilot_result.get("final_metrics") or {}).get("final_wer")
+        if pilot.get("status") != "complete" or baseline_wer is None or final_wer is None:
+            raise RuntimeError(
+                "A completed pilot with baseline and final dev WER is required before full training."
+            )
+        if final_wer >= baseline_wer:
+            raise RuntimeError(
+                f"Pilot did not improve unseen-speaker dev WER ({baseline_wer:.4f} -> "
+                f"{final_wer:.4f}); full training is blocked."
+            )
     key = f"train_{mode}"
     existing = state.get("jobs", {}).get(key)
     if existing and existing.get("status") in {"submitted", "running", "complete"}:
