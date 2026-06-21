@@ -1,0 +1,13 @@
+{
+  "version": "asante-twi-tts-eval-v1",
+  "total_prompts": 120,
+  "categories": {
+    "conversational": 40,
+    "questions": 16,
+    "health": 16,
+    "commerce_support": 16,
+    "ghanaian_entities_numbers": 16,
+    "english_code_switching": 16
+  },
+  "policy": "Every prompt must be approved by a Ghanaian reviewer before the suite can pass. Test prompts are frozen and excluded from training."
+}

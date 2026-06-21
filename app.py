@@ -6,7 +6,9 @@ import os
 import secrets
 import subprocess
 import sys
+import time
 from collections import Counter
+from functools import lru_cache
 from pathlib import Path
 
 import gradio as gr
@@ -27,6 +29,9 @@ GHANA_NLP_TEST_REPORT = REPORTS_DIR / "ghana-nlp-test-continuation-v1.json"
 GHANA_WAXAL_TEST_REPORT = REPORTS_DIR / "waxal-test-ghana-nlp-continuation-v1.json"
 ROUND2_SPLIT_AUDIT = REPORTS_DIR / "waxal_round2_split_audit.json"
 ROUND2_JOB_STATE = ROOT / "outputs/modal_jobs/asr_round2.json"
+TTS_JOB_STATE = ROOT / "outputs/modal_jobs/tts.json"
+SMOKE_TTS_AUDIO = ROOT / "outputs/tts/smoke_validation_sample.wav"
+OVERFIT_TTS_AUDIO = ROOT / "outputs/tts/overfit_validation_sample.wav"
 DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
 SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
 SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
@@ -34,6 +39,10 @@ GHANA_SMOKE_RUN_NAME = "smoke-ghana-nlp-only-v1"
 GHANA_SMOKE_SUMMARY = ROOT / "outputs/modal" / GHANA_SMOKE_RUN_NAME / "summary.json"
 CANDIDATE_MODEL_ID = "teckedd/whisper-small-waxal-akan-continuation-v1"
 LOCAL_CANDIDATE_MODEL = ROOT / "outputs/models/whisper-small-waxal-akan-continuation-v1/final"
+ROUND2_MODEL_ID = "teckedd/whisper-small-waxal-round2-specaug-v1"
+LOCAL_ROUND2_MODEL = ROOT / "outputs/verification/whisper-small-waxal-round2-specaug-v1"
+ORIGINAL_MODEL_ID = "teckedd/whisper_small-waxal_akan-asr-v1"
+LIVE_ASR_MODELS = (ROUND2_MODEL_ID, CANDIDATE_MODEL_ID, ORIGINAL_MODEL_ID)
 TTS_COMPARISON_DIR = ROOT / "outputs/tts_comparisons"
 TTS_MODEL_ID = "facebook/mms-tts-aka"
 _TTS_MODEL = None
@@ -616,6 +625,64 @@ def cache_model(model_id: str):
     return status_html(ok, "Model cache", model_id), logs
 
 
+@lru_cache(maxsize=3)
+def live_asr_pipeline(model_id: str):
+    if model_id not in LIVE_ASR_MODELS:
+        raise ValueError("Choose one of the three audited Akan ASR checkpoints.")
+
+    import torch
+    from transformers import pipeline
+
+    if model_id == ROUND2_MODEL_ID and LOCAL_ROUND2_MODEL.exists():
+        model_source = str(LOCAL_ROUND2_MODEL)
+    elif model_id == CANDIDATE_MODEL_ID and LOCAL_CANDIDATE_MODEL.exists():
+        model_source = str(LOCAL_CANDIDATE_MODEL)
+    else:
+        model_source = model_id
+    device = "mps" if torch.backends.mps.is_available() else "cpu"
+    dtype = torch.float16 if device == "mps" else torch.float32
+    recognizer = pipeline(
+        "automatic-speech-recognition",
+        model=model_source,
+        tokenizer=model_source,
+        feature_extractor=model_source,
+        device=device,
+        torch_dtype=dtype,
+    )
+    recognizer.model.generation_config.language = None
+    recognizer.model.generation_config.forced_decoder_ids = None
+    recognizer.model.config.forced_decoder_ids = None
+    return recognizer, device
+
+
+def transcribe_live_audio(audio_path: str | None, model_id: str):
+    if not audio_path:
+        return "", "", model_id, status_html(False, "Live ASR", "Record or upload audio first.")
+    if model_id not in LIVE_ASR_MODELS:
+        return "", "", model_id, status_html(False, "Live ASR", "Unsupported model selection.")
+
+    try:
+        started = time.perf_counter()
+        recognizer, device = live_asr_pipeline(model_id)
+        result = recognizer(audio_path, generate_kwargs={"task": "transcribe"})
+        runtime = time.perf_counter() - started
+        transcript = str(result.get("text", "")).strip()
+        warning = (
+            "Experimental checkpoint: one immutable-test repetition collapse and a speaker-4430 "
+            "regression remain. This arbitrary clip is not benchmark evidence."
+            if model_id == ROUND2_MODEL_ID
+            else "Arbitrary live audio is diagnostic and is not benchmark evidence."
+        )
+        return (
+            transcript,
+            f"{runtime:.2f} s on {device}",
+            model_id,
+            status_html(bool(transcript), "Live ASR", warning),
+        )
+    except Exception as exc:  # Gradio must return a useful failure instead of dropping the event.
+        return "", "", model_id, status_html(False, "Live ASR failed", str(exc))
+
+
 def run_eval(model_id: str, limit: int, language: str):
     manifest = LOCAL_MANIFEST if LOCAL_MANIFEST.exists() else PREVIEW_MANIFEST
     if not manifest.exists():
@@ -937,6 +1004,87 @@ def cancel_round2_job():
     return round2_training_board(), status_html(ok, "Round 2 cancel", detail)
 
 
+def tts_training_board() -> str:
+    state = {"deployment": "unknown", "jobs": {}}
+    if TTS_JOB_STATE.exists():
+        state = json.loads(TTS_JOB_STATE.read_text(encoding="utf-8"))
+    jobs = state.get("jobs", {})
+
+    def status(key: str, fallback: str = "locked") -> str:
+        job = jobs.get(key) or {}
+        value = job.get("status", fallback)
+        call_id = job.get("call_id")
+        return f"{value}{f' · {call_id}' if call_id else ''}"
+
+    return f"""
+<div class="ak-card">
+  <div class="ak-status">Asante Twi TTS · active milestone</div>
+  <div class="ak-muted">SpeechT5 first. Farmerline/Akosua is diagnostic only; commercial promotion requires the owned, consented 12-hour voice corpus.</div>
+  <div class="ak-chiprow">
+    <span class="ak-chip {'mint' if state.get('deployment') == 'ready' else 'butter'}">runner {state.get('deployment', 'unknown')}</span>
+    <span class="ak-chip sky">data {jobs.get('prepare', {}).get('status', 'not started')}</span>
+    <span class="ak-chip peach">smoke {jobs.get('train_smoke', {}).get('status', 'locked')}</span>
+    <span class="ak-chip peach">overfit {jobs.get('train_overfit', {}).get('status', 'locked')}</span>
+    <span class="ak-chip rose">pilot {jobs.get('train_pilot', {}).get('status', 'locked')}</span>
+    <span class="ak-chip rose">full {jobs.get('train_full', {}).get('status', 'locked')}</span>
+  </div>
+</div>
+
+| Ordered gate | Durable state |
+|---|---|
+| 1. Decode, VAD/loudness QA, hashes and text-disjoint split | {status('prepare', 'not started')} |
+| 2. Tokenizer audit + 20-step smoke | {status('train_smoke')} |
+| 3. Overfit 32 examples | {status('train_overfit')} |
+| 4. 1,000-step diagnostic pilot | {status('train_pilot')} |
+| 5. Ghanaian listener review | required before full |
+| 6. Up to 8,000 steps | {status('train_full')} |
+
+`ɛ` and `ɔ` are preserved by extending the SpeechT5 character tokenizer. Numeric forms are quarantined until their spoken-Twi expansion is reviewed.
+"""
+
+
+def run_tts_action(action: str):
+    commands = {
+        "deploy": [PYTHON, "scripts/modal_tts_jobs.py", "deploy"],
+        "prepare": [PYTHON, "scripts/modal_tts_jobs.py", "prepare"],
+        "smoke": [PYTHON, "scripts/modal_tts_jobs.py", "train", "--mode", "smoke"],
+        "overfit": [PYTHON, "scripts/modal_tts_jobs.py", "train", "--mode", "overfit"],
+        "pilot": [PYTHON, "scripts/modal_tts_jobs.py", "train", "--mode", "pilot"],
+        "full": [PYTHON, "scripts/modal_tts_jobs.py", "train", "--mode", "full"],
+        "refresh": [PYTHON, "scripts/modal_tts_jobs.py", "status"],
+    }
+    if action not in commands:
+        raise ValueError(f"Unsupported TTS action: {action}")
+    ok, output = run_command(commands[action], timeout=600)
+    detail = "Action accepted." if ok else output.splitlines()[-1] if output else "Action failed."
+    return tts_training_board(), status_html(ok, f"TTS {action}", detail)
+
+
+def cancel_tts_job():
+    state = json.loads(TTS_JOB_STATE.read_text()) if TTS_JOB_STATE.exists() else {}
+    jobs = state.get("jobs", {})
+    active = next(
+        (key for key, job in reversed(list(jobs.items())) if job.get("status") in {"submitted", "running"}),
+        None,
+    )
+    if not active:
+        return tts_training_board(), status_html(False, "TTS cancel", "No active job.")
+    ok, output = run_command([PYTHON, "scripts/modal_tts_jobs.py", "cancel", active], timeout=60)
+    detail = f"Cancelled {active}." if ok else output.splitlines()[-1]
+    return tts_training_board(), status_html(ok, "TTS cancel", detail)
+
+
+def review_tts_overfit(note: str):
+    if not note.strip():
+        return tts_training_board(), status_html(False, "Overfit review", "Add a listening note.")
+    ok, output = run_command(
+        [PYTHON, "scripts/modal_tts_jobs.py", "review-overfit", "--approve", "--note", note],
+        timeout=60,
+    )
+    detail = "Overfit gate approved; pilot is unlocked." if ok else output.splitlines()[-1]
+    return tts_training_board(), status_html(ok, "Overfit review", detail)
+
+
 def benchmark_board() -> str:
     if not DECODER_ANALYSIS.exists():
         return "_Run the frozen benchmark before selecting a decoder strategy._"
@@ -1206,10 +1354,11 @@ def build_app() -> gr.Blocks:
                     gr.Markdown("## Reproduce the existing model\nEvaluate the published Waxal fine-tune on the exact sample pack prepared in step 1. The Yoruba hint is retained as a baseline experiment, not assumed to be optimal Akan handling.")
                     model_id = gr.Dropdown(
                         choices=[
+                            ROUND2_MODEL_ID,
                             CANDIDATE_MODEL_ID,
-                            "teckedd/whisper_small-waxal_akan-asr-v1",
+                            ORIGINAL_MODEL_ID,
                         ],
-                        value=CANDIDATE_MODEL_ID,
+                        value=ROUND2_MODEL_ID,
                         label="Model",
                         allow_custom_value=True,
                     )
@@ -1240,6 +1389,36 @@ def build_app() -> gr.Blocks:
                     eval_report_path = gr.State()
                     dry_btn.click(dry_run_eval, inputs=[model_id, eval_limit, language], outputs=[eval_status, eval_logs])
                     cache_btn.click(cache_model, inputs=model_id, outputs=[eval_status, eval_logs])
+
+                    gr.Markdown(
+                        "## Live ASR\nRecord or upload one clip to compare the three published "
+                        "checkpoints. This is an informal transcription test, separate from the "
+                        "fixed sample-pack WER evaluation below."
+                    )
+                    with gr.Row():
+                        live_audio = gr.Audio(
+                            label="Akan speech",
+                            sources=["microphone", "upload"],
+                            type="filepath",
+                            format="wav",
+                        )
+                        with gr.Column():
+                            live_model = gr.Dropdown(
+                                choices=list(LIVE_ASR_MODELS),
+                                value=ROUND2_MODEL_ID,
+                                label="Checkpoint",
+                            )
+                            live_transcribe = gr.Button("Transcribe", variant="primary")
+                            live_status = gr.HTML()
+                    live_transcript = gr.Textbox(label="Transcript", lines=4, interactive=False)
+                    with gr.Row():
+                        live_runtime = gr.Textbox(label="Runtime", interactive=False)
+                        live_model_used = gr.Textbox(label="Model ID", interactive=False)
+                    live_transcribe.click(
+                        transcribe_live_audio,
+                        inputs=[live_audio, live_model],
+                        outputs=[live_transcript, live_runtime, live_model_used, live_status],
+                    )
 
                     gr.Markdown(
                         "## Listen row by row\nPlay the original recording, then generate the reference and prediction with the same Akan TTS model. This makes text differences audible without changing the ASR score."
@@ -1307,49 +1486,73 @@ def build_app() -> gr.Blocks:
                     )
 
                 with gr.Tab("3 · Train"):
-                    round2_board = gr.Markdown(round2_training_board())
-                    round2_status = gr.HTML()
+                    tts_board = gr.Markdown(tts_training_board())
+                    tts_status = gr.HTML()
                     with gr.Row():
-                        deploy_round2 = gr.Button("Deploy runner", variant="secondary")
-                        prepare_round2 = gr.Button("Prepare + audit", variant="primary")
-                        smoke_round2 = gr.Button("Run 2-step smoke", variant="primary")
-                        pilot_round2 = gr.Button("Run 200-step pilot", variant="secondary")
-                        full_round2 = gr.Button("Run full training", variant="secondary")
-                        test_round2 = gr.Button("Evaluate immutable test", variant="secondary")
-                        refresh_round2 = gr.Button("Refresh", variant="secondary")
-                        cancel_round2 = gr.Button("Cancel active", variant="stop")
-                    deploy_round2.click(
-                        lambda: run_round2_action("deploy"),
-                        outputs=[round2_board, round2_status],
+                        deploy_tts = gr.Button("Deploy TTS runner", variant="secondary")
+                        prepare_tts = gr.Button("Audit corpus", variant="primary")
+                        smoke_tts = gr.Button("20-step smoke", variant="secondary")
+                        overfit_tts = gr.Button("Overfit 32", variant="secondary")
+                        pilot_tts = gr.Button("1,000-step pilot", variant="secondary")
+                        full_tts = gr.Button("Full run", variant="secondary")
+                        refresh_tts = gr.Button("Refresh", variant="secondary")
+                        cancel_tts = gr.Button("Cancel active", variant="stop")
+                    deploy_tts.click(
+                        lambda: run_tts_action("deploy"), outputs=[tts_board, tts_status]
                     )
-                    prepare_round2.click(
-                        lambda: run_round2_action("prepare"),
-                        outputs=[round2_board, round2_status],
+                    prepare_tts.click(
+                        lambda: run_tts_action("prepare"), outputs=[tts_board, tts_status]
                     )
-                    smoke_round2.click(
-                        lambda: run_round2_action("smoke"),
-                        outputs=[round2_board, round2_status],
+                    smoke_tts.click(
+                        lambda: run_tts_action("smoke"), outputs=[tts_board, tts_status]
                     )
-                    pilot_round2.click(
-                        lambda: run_round2_action("pilot"),
-                        outputs=[round2_board, round2_status],
+                    overfit_tts.click(
+                        lambda: run_tts_action("overfit"), outputs=[tts_board, tts_status]
                     )
-                    full_round2.click(
-                        lambda: run_round2_action("full"),
-                        outputs=[round2_board, round2_status],
+                    pilot_tts.click(
+                        lambda: run_tts_action("pilot"), outputs=[tts_board, tts_status]
                     )
-                    test_round2.click(
-                        lambda: run_round2_action("evaluate-test"),
-                        outputs=[round2_board, round2_status],
+                    full_tts.click(
+                        lambda: run_tts_action("full"), outputs=[tts_board, tts_status]
                     )
-                    refresh_round2.click(
-                        lambda: run_round2_action("refresh"),
-                        outputs=[round2_board, round2_status],
+                    refresh_tts.click(
+                        lambda: run_tts_action("refresh"), outputs=[tts_board, tts_status]
                     )
-                    cancel_round2.click(
-                        cancel_round2_job,
-                        outputs=[round2_board, round2_status],
+                    cancel_tts.click(
+                        cancel_tts_job, outputs=[tts_board, tts_status]
                     )
+
+                    gr.Markdown("### Listen before unlocking the pilot")
+                    with gr.Row():
+                        gr.Audio(
+                            value=str(SMOKE_TTS_AUDIO) if SMOKE_TTS_AUDIO.exists() else None,
+                            label="20-step smoke sample",
+                            interactive=False,
+                        )
+                        gr.Audio(
+                            value=str(OVERFIT_TTS_AUDIO) if OVERFIT_TTS_AUDIO.exists() else None,
+                            label="32-example overfit sample",
+                            interactive=False,
+                        )
+                    overfit_note = gr.Textbox(
+                        label="Ghanaian listening note",
+                        placeholder="Record intelligibility, skipped/repeated words, and pronunciation.",
+                    )
+                    approve_overfit = gr.Button("Approve overfit gate", variant="primary")
+                    approve_overfit.click(
+                        review_tts_overfit,
+                        inputs=overfit_note,
+                        outputs=[tts_board, tts_status],
+                    )
+
+                    with gr.Accordion("Completed ASR training record", open=False):
+                        gr.Markdown(round2_training_board())
+                        gr.Markdown(
+                            "Round 2 is published experimentally at "
+                            "[teckedd/whisper-small-waxal-round2-specaug-v1]"
+                            "(https://huggingface.co/teckedd/whisper-small-waxal-round2-specaug-v1): "
+                            "32.84% immutable-test WER / 11.79% CER. ASR training is closed."
+                        )
 
                     with gr.Accordion("Previous experiments", open=False):
                         gr.HTML(training_plan())

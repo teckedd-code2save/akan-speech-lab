@@ -1,0 +1,20 @@
+run_name: speecht5-farmerline-akosua-diagnostic-v1
+base_model: microsoft/speecht5_tts
+vocoder: microsoft/speecht5_hifigan
+speaker_encoder: speechbrain/spkrec-xvect-voxceleb
+dataset: Farmerline-DCS-HCI25/akan_tts_dataset
+dataset_revision: 050b308e66155bb5e3d843b01ebca51f9d7056e2
+license: cc-by-4.0
+consent_status: public-diagnostic-no-explicit-speaker-consent
+sample_rate: 16000
+seed: 42
+learning_rate: 0.00001
+warmup_steps: 100
+train_batch_size: 4
+eval_batch_size: 4
+gradient_accumulation_steps: 8
+eval_steps: 200
+save_steps: 200
+max_steps: 8000
+early_stopping_patience: 3
+notes: Diagnostic only. Commercial promotion requires the owned, consented 12-hour corpus.

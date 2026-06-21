@@ -108,7 +108,8 @@ Round 2 audit details:
 - full call: `fc-01KVK05E72XEYKY86K474AEBDM`
 - immutable test call: `fc-01KVKND8SSVYMKJ1A7CXHE4D0Q`
 
-1. Do not publish the Round 2 checkpoint; see [Round 2 results](ASR_ROUND2_RESULTS.md).
+1. Round 2 was published as an explicitly experimental checkpoint at
+   `teckedd/whisper-small-waxal-round2-specaug-v1`; it remains non-promoted.
 2. Diagnose speaker `4430` and the row-347 repetition collapse using development analogues, not repeated test tuning.
 3. Design Round 3 around development-only error buckets and a repetition fallback.
 4. Keep `test_v1` frozen; do not use its rows for checkpoint selection or training changes.
@@ -123,6 +124,11 @@ ASR is closed. TTS is the active milestone:
 4. Train a single-speaker or explicitly conditioned multi-speaker baseline only when speaker identity is reliable.
 5. Keep `facebook/mms-tts-aka` as a non-commercial diagnostic baseline because of its CC-BY-NC license.
 6. Publish a commercial candidate only from data and model licenses that permit commercial use.
+
+Implementation details, research sources, data gates, and acceptance thresholds are frozen in
+[TTS_RESEARCH_AND_EXECUTION.md](TTS_RESEARCH_AND_EXECUTION.md). The current executable stage is
+the 20-step SpeechT5 smoke after the Farmerline CPU audit accepted 861 of 1,467 Akosua rows with
+zero normalized-text split overlap. No pilot or full TTS run has been submitted.
 
 ## ASR Round 3 Closure
 

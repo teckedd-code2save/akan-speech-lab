@@ -204,6 +204,28 @@ def submit_test_evaluation() -> dict[str, Any]:
     return job
 
 
+def submit_publication() -> dict[str, Any]:
+    state = refresh()
+    full = state.get("jobs", {}).get("train_full") or {}
+    if full.get("status") != "complete":
+        raise RuntimeError("Completed full training is required before publication.")
+    existing = state.get("jobs", {}).get("publish_hf")
+    if existing and existing.get("status") in {"submitted", "running", "complete"}:
+        return existing
+    call = deployed_function("publish_round2_model").spawn(
+        "teckedd/whisper-small-waxal-round2-specaug-v1"
+    )
+    job = {
+        "kind": "publish_hf",
+        "call_id": call.object_id,
+        "status": "submitted",
+        "submitted_at": now(),
+    }
+    state.setdefault("jobs", {})["publish_hf"] = job
+    save_state(state)
+    return job
+
+
 def cancel(key: str) -> dict[str, Any]:
     state = refresh()
     job = state.get("jobs", {}).get(key)
@@ -227,6 +249,7 @@ def main() -> None:
     train_parser.add_argument("--mode", choices=["smoke", "pilot", "full"], required=True)
     subparsers.add_parser("status")
     subparsers.add_parser("evaluate-test")
+    subparsers.add_parser("publish-hf")
     cancel_parser = subparsers.add_parser("cancel")
     cancel_parser.add_argument("job_key")
     args = parser.parse_args()
@@ -241,6 +264,8 @@ def main() -> None:
         result = cancel(args.job_key)
     elif args.action == "evaluate-test":
         result = submit_test_evaluation()
+    elif args.action == "publish-hf":
+        result = submit_publication()
     else:
         result = refresh()
     print(json.dumps(result, indent=2, default=str))

@@ -12,6 +12,7 @@ CACHE_DIR = "/cache"
 OUTPUT_DIR = "/outputs"
 EVAL_DIR = "/eval-results"
 MANIFEST_DIR = Path("/round2_manifests")
+MODEL_CARD_PATH = Path("/model_card/README.md")
 APP_NAME = "akan-speech-asr-round2"
 PARQUET_REVISION = "fe897206a41cad1b26f39f4c4088a45538ccfced"
 
@@ -36,6 +37,11 @@ image = (
     )
     .env({"HF_HOME": f"{CACHE_DIR}/huggingface", "HF_XET_HIGH_PERFORMANCE": "1"})
     .add_local_dir("data/manifests/waxal_round2", remote_path=str(MANIFEST_DIR), copy=True)
+    .add_local_file(
+        "model_cards/whisper-small-waxal-round2-specaug-v1/README.md",
+        remote_path=str(MODEL_CARD_PATH),
+        copy=True,
+    )
 )
 
 
@@ -544,6 +550,46 @@ def train_round2(config_dict: dict) -> dict:
     summary_path.write_text(json.dumps(summary, indent=2, default=str) + "\n")
     output_volume.commit()
     return summary
+
+
+@app.function(
+    image=image,
+    cpu=2,
+    memory=4096,
+    volumes={OUTPUT_DIR: output_volume},
+    secrets=[modal.Secret.from_name("huggingface-token", required_keys=["HF_TOKEN"])],
+    timeout=2 * HOUR,
+    retries=modal.Retries(max_retries=1, backoff_coefficient=2.0, initial_delay=10.0),
+    max_containers=1,
+)
+def publish_round2_model(repo_id: str) -> dict:
+    import shutil
+
+    from huggingface_hub import HfApi
+
+    source = Path(OUTPUT_DIR) / "whisper-small-waxal-round2-specaug-v1/final"
+    required = [source / "model.safetensors", source / "config.json", MODEL_CARD_PATH]
+    missing = [str(path) for path in required if not path.exists()]
+    if missing:
+        raise RuntimeError(f"Round 2 publication files are missing: {missing}")
+    shutil.copy2(MODEL_CARD_PATH, source / "README.md")
+    api = HfApi()
+    api.create_repo(repo_id, repo_type="model", exist_ok=True)
+    commit = api.upload_folder(
+        repo_id=repo_id,
+        repo_type="model",
+        folder_path=str(source),
+        commit_message="Publish experimental contamination-safe Akan ASR checkpoint",
+        ignore_patterns=["training_args.bin"],
+    )
+    info = api.model_info(repo_id, files_metadata=True)
+    return {
+        "status": "complete",
+        "repo_id": repo_id,
+        "url": f"https://huggingface.co/{repo_id}",
+        "commit": str(commit),
+        "files": sorted(sibling.rfilename for sibling in info.siblings),
+    }
 
 
 @app.function(

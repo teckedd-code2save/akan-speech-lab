@@ -1,10 +1,10 @@
 # Akan Speech Lab
 
-Reusable fine-tuning and evaluation infrastructure for Akan-language speech systems, starting with Twi/Fante ASR and later TTS.
+Reusable fine-tuning and evaluation infrastructure for Akan-language speech systems. ASR is frozen; research-grounded Asante Twi TTS is the active milestone.
 
 The goal is commercial-grade speech infrastructure for domains such as health, ecommerce, customer support, family care, and local voice agents. This repo is intentionally separate from the hackathon app so experiments, datasets, checkpoints, and Modal jobs do not bloat product code.
 
-## Initial Roadmap
+## Milestones
 
 1. Audit Waxal Akan ASR and freeze a reproducible, speaker-balanced benchmark.
 2. Normalize Akan text consistently and inspect data quality before training.
@@ -12,9 +12,9 @@ The goal is commercial-grade speech infrastructure for domains such as health, e
    - `teckedd/whisper_small-waxal_akan-asr-v1`
    - MMS ASR variants
    - any strong public Whisper/Akan checkpoint we validate
-4. Fine-tune ASR with strict eval gates before pushing to Hugging Face.
-5. Add TTS data prep and evaluation after ASR is stable.
-6. Run Modal only for training/eval jobs that need GPU, then shut jobs down.
+4. Publish the experimental Round 2 model with its failed-promotion limitations.
+5. Build SpeechT5 data, tokenizer, training, and human-evaluation gates for Asante Twi TTS.
+6. Run Modal only for durable gated jobs; one container maximum and scale-to-zero.
 
 ## Repository Layout
 
@@ -56,7 +56,9 @@ The UI can:
 - dry-run model evaluation,
 - cache a Hugging Face ASR model,
 - run a small ASR eval,
-- render WER/CER reports.
+- transcribe microphone/upload audio with three published checkpoints,
+- render WER/CER reports,
+- operate the ordered TTS corpus, smoke, overfit, pilot, and full-run gates.
 
 ## Cost Rule
 
@@ -67,17 +69,18 @@ Default workflow is local and CPU-safe. Modal GPU jobs should only run after:
 - the target baseline is recorded,
 - the expected output path and Hugging Face repo are known.
 
-## Current ASR Baseline
+## Current ASR Result
 
 The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`. On this repo's frozen 99-row, 33-speaker Waxal benchmark it scores **33.62% WER / 12.37% CER** with a 30.91%-36.79% bootstrap WER interval. No forced language and the checkpoint's stored Yoruba prompt produce identical predictions; English prompting is invalid for this model. The first candidate therefore uses no forced language token.
 
 The first evidence-driven continuation run improved the complete 1,123-row validation split from **32.69% to 31.45% WER** at step 300. Step 400 regressed to 31.83%. On all 1,522 held-out Waxal test rows, the selected checkpoint improves **33.84% to 32.77% WER** and **12.74% to 12.47% CER**. A 5,000-sample paired bootstrap gives 99.86% probability of improvement and a -1.90 to -0.33 point 95% WER-difference interval. The [experimental candidate](https://huggingface.co/teckedd/whisper-small-waxal-akan-continuation-v1) remains gated because two outputs entered severe repetition loops and Ghanaian listening review is pending.
 
-The first GhanaNLP-only adaptation reduced held-out GhanaNLP WER from **160.65% to 99.35%**, but regressed the complete Waxal test from **32.77% to 37.80%**. It is retained as a failed-promotion experiment, not published as a model. The next ASR round must use Waxal replay or an adapter to control forgetting.
+Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal test, compared with 34.32% for the original and 33.66% for the continuation under the same harness. It is published as [teckedd/whisper-small-waxal-round2-specaug-v1](https://huggingface.co/teckedd/whisper-small-waxal-round2-specaug-v1), but is explicitly experimental because one repetition collapse and the speaker-4430 regression failed the promotion gate. ASR training is closed while TTS is built.
 
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
+- [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)
 - [Preprocessing strategy](docs/preprocessing.md)

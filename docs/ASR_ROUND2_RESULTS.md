@@ -4,7 +4,7 @@ Date: 2026-06-21
 
 ## Decision
 
-**Do not promote or publish the Round 2 checkpoint.** It is a statistically supported improvement over both fixed baselines under the same evaluation harness, but it misses the absolute WER target, retains one repetition collapse, and materially regresses one test speaker.
+**Publish experimentally; do not production-promote.** It is a statistically supported improvement over both fixed baselines under the same evaluation harness, but it misses the absolute WER target, retains one repetition collapse, and materially regresses one test speaker. Publication enables Ghanaian testing without reversing the failed promotion decision.
 
 Selected checkpoint: `whisper-small-waxal-round2-specaug-v1/checkpoint-1200`
 
@@ -63,5 +63,8 @@ The repetition failure is dataset row 347, sample `ak_gh_image_0828_u776_1_16821
 - Immutable evaluation call: `fc-01KVKND8SSVYMKJ1A7CXHE4D0Q`
 - Full report: Modal volume `akan-speech-eval-results`, file `waxal-round2-immutable-test-v1.json`
 - Compact summary: `waxal-round2-immutable-test-v1.summary.json`
+- Hub model: `teckedd/whisper-small-waxal-round2-specaug-v1`
+- Publication call: `fc-01KVNRYEPA1KN4BMQ8H3PQTSMA`
+- Published/local `model.safetensors` SHA-256: `80d4d89412d5e31af617893217e8a5b4bd26bd57e31b5b88ac47758fd79de3a7`
 
 The next ASR experiment must target the identified speaker and repetition failures without decoding `test_v1` again for checkpoint selection. New model selection remains development-only.
