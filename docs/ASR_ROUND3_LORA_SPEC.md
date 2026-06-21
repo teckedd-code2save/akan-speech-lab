@@ -1,6 +1,6 @@
 # ASR Round 3: Whisper Medium LoRA Specification
 
-Status: approved final ASR experiment
+Status: complete; pilot failed the development gate. See [Round 3 results](ASR_ROUND3_LORA_RESULTS.md).
 
 ## Goal
 

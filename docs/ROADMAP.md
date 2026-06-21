@@ -6,7 +6,7 @@ Last updated: 2026-06-20
 
 Build commercially usable Akan speech infrastructure for health, ecommerce, support, and voice-agent products. The lab must improve ASR and TTS through reproducible data preparation, frozen evaluation sets, controlled training experiments, Ghanaian listening review, and explicit licensing.
 
-The current work is **ASR round 2**. TTS training has not started.
+ASR experimentation is closed after Round 3 failed its preregistered gate. The current work is now **commercially usable Akan TTS**.
 
 ## Current Position
 
@@ -115,7 +115,7 @@ Round 2 audit details:
 
 ## TTS Roadmap
 
-TTS starts after ASR round 1 is closed:
+ASR is closed. TTS is the active milestone:
 
 1. Audit consent, license, speaker structure, transcript quality, sample rate, clipping, and silence.
 2. Build a fixed Akan prompt set covering health, ecommerce, names, numbers, questions, and code-switching.
@@ -123,6 +123,10 @@ TTS starts after ASR round 1 is closed:
 4. Train a single-speaker or explicitly conditioned multi-speaker baseline only when speaker identity is reliable.
 5. Keep `facebook/mms-tts-aka` as a non-commercial diagnostic baseline because of its CC-BY-NC license.
 6. Publish a commercial candidate only from data and model licenses that permit commercial use.
+
+## ASR Round 3 Closure
+
+Whisper Medium LoRA trained 4.72M adapter parameters for 200 steps but reached 43.73% unseen-speaker dev WER, versus 32.14% for Round 2. The full run was blocked and `test_v1` was not decoded. See [Round 3 results](ASR_ROUND3_LORA_RESULTS.md).
 
 ## Cost and Operations
 
