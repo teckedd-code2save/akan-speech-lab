@@ -655,11 +655,11 @@ def live_asr_pipeline(model_id: str):
     return recognizer, device
 
 
-def transcribe_live_audio(audio_path: str | None, model_id: str):
+def transcribe_live_audio(audio_path: str | None, model_id: str, reference: str = ""):
     if not audio_path:
-        return "", "", model_id, status_html(False, "Live ASR", "Record or upload audio first.")
+        return "", "", model_id, "", status_html(False, "Live ASR", "Record or upload audio first.")
     if model_id not in LIVE_ASR_MODELS:
-        return "", "", model_id, status_html(False, "Live ASR", "Unsupported model selection.")
+        return "", "", model_id, "", status_html(False, "Live ASR", "Unsupported model selection.")
 
     try:
         started = time.perf_counter()
@@ -673,14 +673,22 @@ def transcribe_live_audio(audio_path: str | None, model_id: str):
             if model_id == ROUND2_MODEL_ID
             else "Arbitrary live audio is diagnostic and is not benchmark evidence."
         )
+        if reference.strip():
+            from akan_speech.eval.wer import speech_error_rates
+
+            metrics = speech_error_rates([reference], [transcript])
+            accuracy = f"WER {metrics['wer']:.2%} · CER {metrics['cer']:.2%}"
+        else:
+            accuracy = "No reference supplied · qualitative test only"
         return (
             transcript,
             f"{runtime:.2f} s on {device}",
             model_id,
+            accuracy,
             status_html(bool(transcript), "Live ASR", warning),
         )
     except Exception as exc:  # Gradio must return a useful failure instead of dropping the event.
-        return "", "", model_id, status_html(False, "Live ASR failed", str(exc))
+        return "", "", model_id, "", status_html(False, "Live ASR failed", str(exc))
 
 
 def run_eval(model_id: str, limit: int, language: str):
@@ -1350,8 +1358,49 @@ def build_app() -> gr.Blocks:
                         outputs=[ghana_audit_status, ghana_audit_logs, ghana_audit_report],
                     ).then(app_summary, outputs=state)
 
-                with gr.Tab("2 · Baseline"):
-                    gr.Markdown("## Reproduce the existing model\nEvaluate the published Waxal fine-tune on the exact sample pack prepared in step 1. The Yoruba hint is retained as a baseline experiment, not assumed to be optimal Akan handling.")
+                with gr.Tab("2 · Test ASR"):
+                    gr.Markdown(
+                        "## Record and transcribe\nSpeak naturally in Twi/Akan or upload a clip. "
+                        "Add the words you said if you want clip-level WER/CER."
+                    )
+                    with gr.Row():
+                        live_audio = gr.Audio(
+                            label="Record or upload Akan speech",
+                            sources=["microphone", "upload"],
+                            type="filepath",
+                            format="wav",
+                        )
+                        with gr.Column():
+                            live_model = gr.Dropdown(
+                                choices=list(LIVE_ASR_MODELS),
+                                value=ROUND2_MODEL_ID,
+                                label="Checkpoint",
+                            )
+                            live_reference = gr.Textbox(
+                                label="What you said (optional)",
+                                lines=3,
+                                placeholder="Enter the exact Twi/Akan words for WER/CER.",
+                            )
+                            live_transcribe = gr.Button("Transcribe recording", variant="primary")
+                            live_status = gr.HTML()
+                    live_transcript = gr.Textbox(label="Model transcript", lines=4, interactive=False)
+                    with gr.Row():
+                        live_accuracy = gr.Textbox(label="Clip accuracy", interactive=False)
+                        live_runtime = gr.Textbox(label="Runtime", interactive=False)
+                        live_model_used = gr.Textbox(label="Model ID", interactive=False)
+                    live_transcribe.click(
+                        transcribe_live_audio,
+                        inputs=[live_audio, live_model, live_reference],
+                        outputs=[
+                            live_transcript,
+                            live_runtime,
+                            live_model_used,
+                            live_accuracy,
+                            live_status,
+                        ],
+                    )
+
+                    gr.Markdown("## Fixed sample evaluation\nEvaluate the published models on the exact sample pack prepared in step 1. This benchmark workflow remains separate from arbitrary recordings.")
                     model_id = gr.Dropdown(
                         choices=[
                             ROUND2_MODEL_ID,
@@ -1389,36 +1438,6 @@ def build_app() -> gr.Blocks:
                     eval_report_path = gr.State()
                     dry_btn.click(dry_run_eval, inputs=[model_id, eval_limit, language], outputs=[eval_status, eval_logs])
                     cache_btn.click(cache_model, inputs=model_id, outputs=[eval_status, eval_logs])
-
-                    gr.Markdown(
-                        "## Live ASR\nRecord or upload one clip to compare the three published "
-                        "checkpoints. This is an informal transcription test, separate from the "
-                        "fixed sample-pack WER evaluation below."
-                    )
-                    with gr.Row():
-                        live_audio = gr.Audio(
-                            label="Akan speech",
-                            sources=["microphone", "upload"],
-                            type="filepath",
-                            format="wav",
-                        )
-                        with gr.Column():
-                            live_model = gr.Dropdown(
-                                choices=list(LIVE_ASR_MODELS),
-                                value=ROUND2_MODEL_ID,
-                                label="Checkpoint",
-                            )
-                            live_transcribe = gr.Button("Transcribe", variant="primary")
-                            live_status = gr.HTML()
-                    live_transcript = gr.Textbox(label="Transcript", lines=4, interactive=False)
-                    with gr.Row():
-                        live_runtime = gr.Textbox(label="Runtime", interactive=False)
-                        live_model_used = gr.Textbox(label="Model ID", interactive=False)
-                    live_transcribe.click(
-                        transcribe_live_audio,
-                        inputs=[live_audio, live_model],
-                        outputs=[live_transcript, live_runtime, live_model_used, live_status],
-                    )
 
                     gr.Markdown(
                         "## Listen row by row\nPlay the original recording, then generate the reference and prediction with the same Akan TTS model. This makes text differences audible without changing the ASR score."
@@ -1522,7 +1541,11 @@ def build_app() -> gr.Blocks:
                         cancel_tts_job, outputs=[tts_board, tts_status]
                     )
 
-                    gr.Markdown("### Listen before unlocking the pilot")
+                    gr.Markdown(
+                        "### TTS quality check\nThe 1,000-step run is intentionally paused until "
+                        "the short overfit sample sounds intelligible. This avoids spending Modal "
+                        "credits on a broken alignment."
+                    )
                     with gr.Row():
                         gr.Audio(
                             value=str(SMOKE_TTS_AUDIO) if SMOKE_TTS_AUDIO.exists() else None,
@@ -1538,7 +1561,9 @@ def build_app() -> gr.Blocks:
                         label="Ghanaian listening note",
                         placeholder="Record intelligibility, skipped/repeated words, and pronunciation.",
                     )
-                    approve_overfit = gr.Button("Approve overfit gate", variant="primary")
+                    approve_overfit = gr.Button(
+                        "Audio is intelligible · continue to pilot", variant="primary"
+                    )
                     approve_overfit.click(
                         review_tts_overfit,
                         inputs=overfit_note,
