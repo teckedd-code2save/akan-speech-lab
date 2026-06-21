@@ -93,7 +93,8 @@ Implementation status:
 - two-step L4 smoke with SpecAugment, eval, checkpoint, and resume artifacts: passed
 - 200-step pilot: passed; unseen-speaker dev WER 114.03% -> 43.93%
 - full 2,000-step run: complete; checkpoint 1200 selected at 32.14% unseen-speaker dev WER
-- immutable test: ready for one-time evaluation
+- immutable test: complete; 32.84% WER / 11.79% CER
+- promotion: failed; target was below 30.86%, with zero repetition collapses
 
 Round 2 audit details:
 
@@ -105,10 +106,12 @@ Round 2 audit details:
 - smoke call: `fc-01KVJW5QZMZE0ZYFZPMJ1PBYH7`
 - pilot call: `fc-01KVJWJVRQAPQWDWZ81TMQSD1V`
 - full call: `fc-01KVK05E72XEYKY86K474AEBDM`
+- immutable test call: `fc-01KVKND8SSVYMKJ1A7CXHE4D0Q`
 
-1. Evaluate checkpoint 1200 once on the immutable 1,522-row Waxal test.
-2. Build error buckets: duration, dialect markers, English/code-switching, names, and repetition.
-3. Promote only if test WER beats 30.86% and Ghanaian listening review confirms the gain.
+1. Do not publish the Round 2 checkpoint; see [Round 2 results](ASR_ROUND2_RESULTS.md).
+2. Diagnose speaker `4430` and the row-347 repetition collapse using development analogues, not repeated test tuning.
+3. Design Round 3 around development-only error buckets and a repetition fallback.
+4. Keep `test_v1` frozen; do not use its rows for checkpoint selection or training changes.
 
 ## TTS Roadmap
 

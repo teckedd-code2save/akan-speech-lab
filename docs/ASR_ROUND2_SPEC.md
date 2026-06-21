@@ -1,6 +1,6 @@
 # ASR Round 2: Contamination-Safe Waxal Training Specification
 
-Status: approved design, not yet launched
+Status: complete; checkpoint not promoted. See [ASR Round 2 Results](ASR_ROUND2_RESULTS.md).
 
 ## 1. Goal
 
