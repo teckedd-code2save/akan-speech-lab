@@ -127,8 +127,9 @@ ASR is closed. TTS is the active milestone:
 
 Implementation details, research sources, data gates, and acceptance thresholds are frozen in
 [TTS_RESEARCH_AND_EXECUTION.md](TTS_RESEARCH_AND_EXECUTION.md). The current executable stage is
-the 20-step SpeechT5 smoke after the Farmerline CPU audit accepted 861 of 1,467 Akosua rows with
-zero normalized-text split overlap. No pilot or full TTS run has been submitted.
+the raw-grapheme VITS fallback. SpeechT5 passed mechanical smoke and loss checks but failed to
+memorize a 32-example training sentence intelligibly, so its pilot and full run were cancelled.
+No VITS GPU run has been submitted.
 
 ## ASR Round 3 Closure
 

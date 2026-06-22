@@ -226,6 +226,27 @@ def review_overfit(approved: bool, note: str) -> dict[str, Any]:
     return gate
 
 
+def submit_overfit_diagnostic() -> dict[str, Any]:
+    state = refresh()
+    _require_complete(state, "train_overfit")
+    key = "diagnose_overfit_train"
+    existing = state.get("jobs", {}).get(key)
+    if existing and existing.get("status") in {"submitted", "running", "complete"}:
+        return existing
+    function = modal.Function.from_name(APP_NAME, "synthesize_saved_checkpoint")
+    function.hydrate()
+    call = function.spawn("overfit32-speecht5-farmerline-akosua-v1", "train", 0)
+    job = {
+        "kind": "diagnostic_synthesis",
+        "call_id": call.object_id,
+        "status": "submitted",
+        "submitted_at": now(),
+    }
+    state.setdefault("jobs", {})[key] = job
+    save_state(state)
+    return job
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Durable gated Modal controller for Akan TTS")
     commands = parser.add_subparsers(dest="action", required=True)
@@ -239,6 +260,7 @@ def main() -> None:
     review = commands.add_parser("review-overfit")
     review.add_argument("--approve", action="store_true")
     review.add_argument("--note", required=True)
+    commands.add_parser("diagnose-overfit")
     args = parser.parse_args()
     if args.action == "deploy":
         result = deploy()
@@ -250,6 +272,8 @@ def main() -> None:
         result = cancel(args.job_key)
     elif args.action == "review-overfit":
         result = review_overfit(args.approve, args.note)
+    elif args.action == "diagnose-overfit":
+        result = submit_overfit_diagnostic()
     else:
         result = refresh()
     print(json.dumps(result, indent=2, default=str))

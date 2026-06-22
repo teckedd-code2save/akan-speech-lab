@@ -95,6 +95,22 @@ to zero after 30 seconds.
   loss reached 0.5703. The pilot remains locked pending Ghanaian listening
   review of the saved synthesis.
 
+### Overfit rejection
+
+Ghanaian listening review described the held-out synthesis as muffled. Objective
+diagnostics confirmed an intelligibility failure rather than a simple loudness or
+bandwidth problem: the held-out output round-tripped through fixed Round 2 ASR as
+`ɛyɛ mɛmɛmɛ hɔ` for `ɛgye mmerɛ ne ahoɔden` (100% WER).
+
+The original gate also presented held-out text, which was insufficient evidence
+of memorization. Durable diagnostic call `fc-01KVPD8KE7VREYZVS4SJJJEVRG`
+therefore synthesized an actual member of the 32-example training subset. Its
+source round-tripped at 40% WER, while the generated clip round-tripped at 100%
+WER with unrelated output. SpeechT5 therefore failed to memorize its training
+text despite the falling spectrogram loss. The 1,000-step pilot is cancelled.
+This activates the preregistered raw-grapheme VITS fallback; it does not justify
+spending more steps on the failed SpeechT5 configuration.
+
 ## Evaluation
 
 The frozen 120-prompt suite must cover conversational Twi, health, commerce,

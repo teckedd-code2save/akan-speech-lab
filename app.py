@@ -32,6 +32,8 @@ ROUND2_JOB_STATE = ROOT / "outputs/modal_jobs/asr_round2.json"
 TTS_JOB_STATE = ROOT / "outputs/modal_jobs/tts.json"
 SMOKE_TTS_AUDIO = ROOT / "outputs/tts/smoke_validation_sample.wav"
 OVERFIT_TTS_AUDIO = ROOT / "outputs/tts/overfit_validation_sample.wav"
+OVERFIT_TRAIN_REFERENCE = ROOT / "outputs/tts/overfit_train_reference.wav"
+OVERFIT_TRAIN_GENERATED = ROOT / "outputs/tts/overfit_train_generated.wav"
 DECODER_ANALYSIS = REPORTS_DIR / "waxal_decoder_analysis.json"
 SMOKE_RUN_NAME = "smoke-whisper-small-waxal-aka-no-language-v5"
 SMOKE_SUMMARY = ROOT / "outputs/modal" / SMOKE_RUN_NAME / "summary.json"
@@ -1017,6 +1019,9 @@ def tts_training_board() -> str:
     if TTS_JOB_STATE.exists():
         state = json.loads(TTS_JOB_STATE.read_text(encoding="utf-8"))
     jobs = state.get("jobs", {})
+    overfit_gate = ((jobs.get("train_overfit") or {}).get("result") or {}).get(
+        "overfit_gate", {}
+    )
 
     def status(key: str, fallback: str = "locked") -> str:
         job = jobs.get(key) or {}
@@ -1043,6 +1048,7 @@ def tts_training_board() -> str:
 | 1. Decode, VAD/loudness QA, hashes and text-disjoint split | {status('prepare', 'not started')} |
 | 2. Tokenizer audit + 20-step smoke | {status('train_smoke')} |
 | 3. Overfit 32 examples | {status('train_overfit')} |
+| Perceptual overfit review | {overfit_gate.get('status', 'pending')} |
 | 4. 1,000-step diagnostic pilot | {status('train_pilot')} |
 | 5. Ghanaian listener review | required before full |
 | 6. Up to 8,000 steps | {status('train_full')} |
@@ -1542,33 +1548,41 @@ def build_app() -> gr.Blocks:
                     )
 
                     gr.Markdown(
-                        "### TTS quality check\nThe 1,000-step run is intentionally paused until "
-                        "the short overfit sample sounds intelligible. This avoids spending Modal "
-                        "credits on a broken alignment."
+                        "### TTS quality check\nSpeechT5 failed the 32-example memorization gate. "
+                        "Compare the exact training recording with what the checkpoint generated; "
+                        "the 1,000-step run remains cancelled."
                     )
                     with gr.Row():
                         gr.Audio(
-                            value=str(SMOKE_TTS_AUDIO) if SMOKE_TTS_AUDIO.exists() else None,
-                            label="20-step smoke sample",
+                            value=(
+                                str(OVERFIT_TRAIN_REFERENCE)
+                                if OVERFIT_TRAIN_REFERENCE.exists()
+                                else None
+                            ),
+                            label="Source training recording",
                             interactive=False,
                         )
                         gr.Audio(
-                            value=str(OVERFIT_TTS_AUDIO) if OVERFIT_TTS_AUDIO.exists() else None,
-                            label="32-example overfit sample",
+                            value=(
+                                str(OVERFIT_TRAIN_GENERATED)
+                                if OVERFIT_TRAIN_GENERATED.exists()
+                                else None
+                            ),
+                            label="SpeechT5 output for the same training text",
                             interactive=False,
                         )
-                    overfit_note = gr.Textbox(
-                        label="Ghanaian listening note",
-                        placeholder="Record intelligibility, skipped/repeated words, and pronunciation.",
-                    )
-                    approve_overfit = gr.Button(
-                        "Audio is intelligible · continue to pilot", variant="primary"
-                    )
-                    approve_overfit.click(
-                        review_tts_overfit,
-                        inputs=overfit_note,
-                        outputs=[tts_board, tts_status],
-                    )
+                    with gr.Accordion("Earlier held-out diagnostics", open=False):
+                        with gr.Row():
+                            gr.Audio(
+                                value=str(SMOKE_TTS_AUDIO) if SMOKE_TTS_AUDIO.exists() else None,
+                                label="20-step smoke output",
+                                interactive=False,
+                            )
+                            gr.Audio(
+                                value=str(OVERFIT_TTS_AUDIO) if OVERFIT_TTS_AUDIO.exists() else None,
+                                label="Overfit checkpoint on held-out text",
+                                interactive=False,
+                            )
 
                     with gr.Accordion("Completed ASR training record", open=False):
                         gr.Markdown(round2_training_board())

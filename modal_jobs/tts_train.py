@@ -399,3 +399,64 @@ def train_speecht5(config_dict: dict) -> dict:
     summary_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False, default=str) + "\n")
     output_volume.commit()
     return summary
+
+
+@app.function(
+    image=image,
+    gpu="L4",
+    cpu=4,
+    memory=16384,
+    volumes={CACHE_DIR: cache_volume, OUTPUT_DIR: output_volume},
+    timeout=30 * 60,
+    retries=modal.Retries(max_retries=1, backoff_coefficient=2.0, initial_delay=10.0),
+    scaledown_window=30,
+    max_containers=1,
+)
+def synthesize_saved_checkpoint(run_name: str, split: str = "train", index: int = 0) -> dict:
+    import numpy as np
+    import soundfile as sf
+    import torch
+    from transformers import SpeechT5ForTextToSpeech, SpeechT5HifiGan, SpeechT5Processor
+
+    if split not in {"train", "validation", "test"}:
+        raise ValueError("split must be train, validation, or test")
+    final_dir = Path(OUTPUT_DIR) / run_name / "final"
+    if not final_dir.exists():
+        raise RuntimeError(f"Missing saved checkpoint: {final_dir}")
+    rows = [json.loads(line) for line in MANIFEST_PATH.read_text().splitlines() if line.strip()]
+    rows = [row for row in rows if row.get("accepted") and row.get("split") == split]
+    if not rows:
+        raise RuntimeError(f"No accepted {split} rows")
+    row = rows[index % len(rows)]
+
+    processor = SpeechT5Processor.from_pretrained(str(final_dir))
+    model = SpeechT5ForTextToSpeech.from_pretrained(str(final_dir)).to("cuda").eval()
+    vocoder = SpeechT5HifiGan.from_pretrained(str(final_dir / "vocoder")).to("cuda").eval()
+    embedding = torch.tensor(
+        np.load(final_dir / "speaker_embedding.npy"), dtype=torch.float32, device="cuda"
+    ).unsqueeze(0)
+    inputs = processor(text=row["normalized_text"], return_tensors="pt").to("cuda")
+    with torch.inference_mode():
+        speech = model.generate_speech(
+            inputs["input_ids"], speaker_embeddings=embedding, vocoder=vocoder
+        )
+    diagnostic_dir = Path(OUTPUT_DIR) / run_name / "diagnostics"
+    diagnostic_dir.mkdir(parents=True, exist_ok=True)
+    output_path = diagnostic_dir / f"{split}-{index}.wav"
+    sf.write(output_path, speech.cpu().numpy(), 16_000)
+    result = {
+        "status": "complete",
+        "run_name": run_name,
+        "split": split,
+        "index": index,
+        "sample_id": row["sample_id"],
+        "text": row["normalized_text"],
+        "reference_audio": row["audio_path"],
+        "generated_audio": str(output_path),
+        "duration_seconds": round(len(speech) / 16_000, 4),
+    }
+    (diagnostic_dir / f"{split}-{index}.json").write_text(
+        json.dumps(result, indent=2, ensure_ascii=False) + "\n"
+    )
+    output_volume.commit()
+    return result
