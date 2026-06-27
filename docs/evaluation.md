@@ -31,10 +31,14 @@ modal run modal_jobs/asr_eval.py \
 
 Then rerun the complete Waxal test with the GhanaNLP checkpoint added as a candidate. A GhanaNLP gain is not promotable if it causes material Waxal regression or repetition collapse.
 
-Promotion rule:
+Evidence rule:
 
-- Do not push a new “best” model unless it improves held-out WER and gives clearly better qualitative Akan output without regressions.
-- First target is below 33.62% corpus WER on benchmark v1, with a practical target of 30.26% or lower for a 10% relative gain.
+- Do not push a new “best” model unless it improves or stays stable on the
+  relevant held-out sets for its intended scope and gives clearly better
+  qualitative Akan output without hidden regressions.
+- Do not reduce the project to beating one historical WER number. WER is a gate;
+  corpus understanding, split discipline, stable decoding, and Ghanaian review
+  are also gates.
 - Compare candidates with paired outputs and bootstrap intervals; do not promote on a tiny preview.
 
 Required ASR slices:

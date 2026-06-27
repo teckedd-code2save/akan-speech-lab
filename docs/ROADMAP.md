@@ -1,12 +1,16 @@
 # Akan Speech Lab Roadmap and Handoff
 
-Last updated: 2026-06-20
+Last updated: 2026-06-27
 
 ## Objective
 
 Build commercially usable Akan speech infrastructure for health, ecommerce, support, and voice-agent products. The lab must improve ASR and TTS through reproducible data preparation, frozen evaluation sets, controlled training experiments, Ghanaian listening review, and explicit licensing.
 
-ASR experimentation is closed after Round 3 failed its preregistered gate. The current work is now **commercially usable Akan TTS**.
+ASR is reopened only for a focused Milestone 1: an expressive Akan recognizer
+grounded in corpus understanding, correction capture, punctuation restoration,
+and auditable prosody tags. The previous blind-training loop remains closed.
+The current best word model is still the published Round 2 checkpoint until a
+new contamination-safe recipe proves it is better for its intended scope.
 
 ## Current Position
 
@@ -114,9 +118,52 @@ Round 2 audit details:
 3. Design Round 3 around development-only error buckets and a repetition fallback.
 4. Keep `test_v1` frozen; do not use its rows for checkpoint selection or training changes.
 
+## ASR Milestone 1
+
+Canonical specification: [ASR Milestone 1: Expressive Akan Recognition](ASR_MILESTONE1_EXPRESSIVE.md).
+Artifact naming: [Artifact Versioning](ARTIFACT_VERSIONING.md).
+Operating loop: [ASR Pipeline Loop](ASR_PIPELINE_LOOP.md).
+Research spine: [ASR Research Spine](ASR_RESEARCH_SPINE.md).
+
+First planned review artifact:
+
+```text
+teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-replay-fullft-v0.1
+```
+
+This is a planned replay-mixed full fine-tune from the current Whisper Small
+path using Waxal as anchor/replay and GhanaNLP after harmonization. It is not
+published until manifest hashes, held-out metrics, failure taxonomy, and
+Ghanaian review notes exist.
+
+This milestone targets the user-facing gaps that WER alone did not solve:
+
+1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any
+   supplemental source characterized before training,
+2. stronger Akan word transcription for the intended domain without hidden
+   cross-corpus regressions,
+3. punctuation restoration for `.`, `,`, `?`, and `!`,
+4. pause, question-rise, emphasis, stretch, and hesitation tags where manually
+   labeled data exists,
+5. a UI feedback loop where recorded audio can be corrected and exported for
+   supervised batch training.
+
+Important boundary: punctuation and expressive tags are evaluated separately
+from normalized WER. They cannot be used to claim a better ASR word model.
+
+Immediate next implementation:
+
+1. Add correction capture and export.
+2. Add punctuation-preserving transcript fields alongside WER-normalized fields.
+3. Add expressive tag schema and manual annotation controls.
+4. Build a corpus-audit table for Waxal, GhanaNLP, and supplemental datasets.
+5. Train a small punctuation restoration baseline before another GPU ASR run.
+6. Run replay-mixed Whisper continuation only after the manifest explains the
+   data mixture and regression gates.
+
 ## TTS Roadmap
 
-ASR is closed. TTS is the active milestone:
+TTS remains the second speech milestone after the ASR feedback loop is usable:
 
 1. Audit consent, license, speaker structure, transcript quality, sample rate, clipping, and silence.
 2. Build a fixed Akan prompt set covering health, ecommerce, names, numbers, questions, and code-switching.

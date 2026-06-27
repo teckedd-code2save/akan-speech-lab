@@ -2,11 +2,16 @@
 
 ## Objective
 
-Build an Akan ASR model that materially beats the existing Waxal Whisper baseline:
+Build an Akan ASR model from a defensible data recipe. The first priority is to
+understand Waxal, GhanaNLP, correction data, and supplemental corpora deeply
+enough that preprocessing and mixing decisions are justified before GPU
+training.
 
-- baseline model: `teckedd/whisper_small-waxal_akan-asr-v1`
+The existing Waxal Whisper model remains reference evidence, not the project
+goal:
+
+- reference model: `teckedd/whisper_small-waxal_akan-asr-v1`
 - reported WER: `34.2849`
-- target: lower WER on a clean held-out set and visibly better Akan transcripts
 
 ## Phase 1: Reproducible Data
 
@@ -19,7 +24,17 @@ Build an Akan ASR model that materially beats the existing Waxal Whisper baselin
    - empty transcripts,
    - top speaker dominance.
 
-Decision: use speaker-safe split for honest eval unless it is too small or broken.
+Decision: use speaker-safe split for honest Waxal eval unless it is too small or broken.
+
+For every added corpus, inspect:
+
+- license and consent
+- speaker identity availability
+- duration/noise/clipping/silence
+- punctuation/casing/orthography conventions
+- duplicate text/audio groups
+- dialect/domain mix
+- code-switching and numerals
 
 ## Phase 2: Baseline Evaluation
 
@@ -42,7 +57,9 @@ Run small budget arms before a long job:
 | C | Waxal speaker-safe | English proxy | measure accidental English/code-switch impact |
 | D | Waxal clean subset | best from A-C | test whether filtering beats more data |
 
-Do not mix GhanaNLP until Waxal-only behavior is understood.
+Do not run another GhanaNLP-only continuation as a promotion path. GhanaNLP
+should enter the serious recipe through harmonization, replay mixing, and
+cross-corpus regression gates.
 
 ## Phase 4: Error Analysis
 
@@ -64,4 +81,3 @@ A model can be published as a serious v2 only if:
 - CER improves or stays acceptable,
 - qualitative examples show better Akan, not just better normalization,
 - model card documents data, split, tokenizer strategy, and limitations.
-

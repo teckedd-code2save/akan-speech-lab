@@ -13,6 +13,9 @@ from pathlib import Path
 
 import gradio as gr
 
+from akan_speech.asr.artifacts import FIRST_ASR_REVIEW
+from akan_speech.asr.pipeline import render_pipeline_markdown
+
 
 ROOT = Path(__file__).resolve().parent
 PYTHON = sys.executable
@@ -376,6 +379,15 @@ def run_command(args: list[str], timeout: int = 1800) -> tuple[bool, str]:
     )
     output = "\n".join(part for part in [proc.stdout.strip(), proc.stderr.strip()] if part)
     return proc.returncode == 0, output or "(no output)"
+
+
+def run_asr_pipeline_local():
+    ok, logs = run_command([PYTHON, "scripts/run_asr_pipeline.py", "--stop-before-train"], timeout=1800)
+    return (
+        pipeline_state_board(),
+        status_html(ok, "ASR pipeline", "Executed local stages and stopped before training."),
+        logs,
+    )
 
 
 def status_html(ok: bool, title: str, body: str = "") -> str:
@@ -1246,16 +1258,16 @@ def comparison_board() -> str:
             reports.append(report)
     reports.sort(key=lambda item: float(item.get("wer", 99)))
     lines = [
-        "### Promotion gate",
+        "### Evidence gate",
         "",
-        "The current floor is **34.28% WER**. A candidate is promoted only below **30.86% WER** (10% relative improvement), with qualitative review of Akan spelling and code-switching.",
+        "A candidate is not promoted by chasing one historical WER number. It must show clean data lineage, better or non-regressed WER/CER on the relevant held-out sets, stable decoding, and Ghanaian qualitative review for Akan spelling, code-switching, punctuation, and meaning.",
         "",
         "| Model | Rows | WER | CER | Status |",
         "|---|---:|---:|---:|---|",
     ]
     for report in reports:
         wer_percent = float(report["wer"]) * 100
-        status = "candidate" if wer_percent < 30.856 else "below gate"
+        status = "review candidate" if report.get("rows", 0) else "preview only"
         lines.append(
             f"| `{report['model_id']}` | {report.get('rows', 0)} | {wer_percent:.2f}% | {float(report.get('cer', 0)) * 100:.2f}% | {status} |"
         )
@@ -1270,6 +1282,65 @@ def comparison_board() -> str:
     return "\n".join(lines)
 
 
+def pipeline_board() -> str:
+    spec = FIRST_ASR_REVIEW
+    return f"""
+## Akan ASR research loop
+
+Each pass should produce a reviewable artifact, preferably on Hugging Face, plus
+the evidence needed to decide whether to learn, relearn, unlearn, or stop.
+
+### First review artifact
+
+```text
+{spec.hf_repo}
+```
+
+This means: Ghanaian Speech Lab · ASR · Akan · Waxal+GhanaNLP · Whisper Small ·
+replay-mixed full fine-tuning · first review candidate.
+
+### One pass
+
+| Step | Output | Gate |
+|---|---|---|
+| Pick | corpus list, base model, failure hypothesis | each dataset has a reason |
+| Prepare | immutable manifest with audio/text hashes | raw, punctuated, normalized, expressive fields are separate |
+| Sanitize | accepted/quarantined rows with reasons | no silent deletion |
+| Train | bounded Modal job and checkpoint | approved manifest only |
+| Test | fixed predictions and metrics | WER/CER by corpus, plus failure taxonomy |
+| Save | config, state, predictions, reports | reproducible without rerunning training |
+| Publish | HF model/dataset/eval artifact | card says what passed and failed |
+| Compare | paired result table | matched rows only |
+| Review | corrected transcripts and notes | consent and model version recorded |
+| Decide | learn, relearn, unlearn, or stop | next pass has one explicit reason |
+
+### Learn / relearn / unlearn
+
+- **Learn:** add corrected speech, better-labeled GhanaNLP/Waxal rows, or new
+  consented domain audio.
+- **Relearn:** rerun with better normalization, corpus mix, tokenizer strategy,
+  decoder, augmentation, or hyperparameters.
+- **Unlearn:** quarantine harmful rows, bad transcript conventions, leakage,
+  noisy domains, or augmentation that causes regressions.
+
+### Research anchors
+
+| Anchor | Why it matters |
+|---|---|
+| [Whisper](https://arxiv.org/abs/2212.04356) | current strongest base; fix data before changing base |
+| [HF ASR fine-tuning course](https://huggingface.co/learn/audio-course/en/chapter5/fine-tuning) | reproducible training loop and Hub publication |
+| [SpecAugment](https://arxiv.org/abs/1904.08779) | train-only feature masking after labels are clean |
+| [Continual/replay fine-tuning](https://link.springer.com/chapter/10.1007/978-3-031-44195-0_40) | mixed replay instead of GhanaNLP-only forgetting |
+| [Online continual ASR](https://www.isca-archive.org/interspeech_2022/yang22w_interspeech.html) | corrections are batched and gated |
+| [Punctuation restoration](https://www.isca-archive.org/interspeech_2015/tilk15_interspeech.html) | punctuation is measured separately from WER |
+| [wav2vec 2.0](https://arxiv.org/abs/2006.11477) | plateau-escape branch if clean Whisper still stalls |
+"""
+
+
+def pipeline_state_board() -> str:
+    return render_pipeline_markdown(ROOT)
+
+
 def build_app() -> gr.Blocks:
     with gr.Blocks(title="Akan Speech Lab", css=CSS) as demo:
         with gr.Column(elem_classes=["ak-shell"]):
@@ -1277,8 +1348,8 @@ def build_app() -> gr.Blocks:
                 """
                 <section class="ak-hero">
                   <div class="ak-kicker">Akan Speech Lab</div>
-                  <h1>Beat the 34.28% Akan ASR baseline.</h1>
-                  <p>Audit the data, reproduce the existing Whisper result, train stronger configurations, and promote only a measured improvement.</p>
+                  <h1>Build a cleaner Akan ASR data recipe.</h1>
+                  <p>Understand each corpus, harmonize transcripts and audio, capture corrections, then train only from evidence-backed mixtures.</p>
                   <div class="ak-chiprow">
                     <span class="ak-chip mint">Waxal aka_asr</span>
                     <span class="ak-chip sky">WER / CER</span>
@@ -1302,6 +1373,29 @@ def build_app() -> gr.Blocks:
             )
 
             with gr.Tabs():
+                with gr.Tab("0 · Pipeline"):
+                    gr.Markdown(pipeline_board())
+                    pipeline_state = gr.Markdown(pipeline_state_board())
+                    with gr.Row():
+                        run_pipeline = gr.Button("Run pipeline until next gate", variant="primary")
+                        refresh_pipeline = gr.Button("Refresh pipeline state", variant="secondary")
+                    pipeline_run_status = gr.HTML()
+                    with gr.Accordion("Pipeline run log", open=False):
+                        pipeline_run_log = gr.Textbox(label="Run log", lines=12, interactive=False)
+                    run_pipeline.click(
+                        run_asr_pipeline_local,
+                        outputs=[pipeline_state, pipeline_run_status, pipeline_run_log],
+                    )
+                    refresh_pipeline.click(pipeline_state_board, outputs=pipeline_state)
+                    gr.Markdown(
+                        "Full notes: [pipeline loop]"
+                        "(/Users/welcome/Documents/SoftwareEngineering/serendepify/akan-speech-lab/docs/ASR_PIPELINE_LOOP.md)"
+                        " · [artifact versioning]"
+                        "(/Users/welcome/Documents/SoftwareEngineering/serendepify/akan-speech-lab/docs/ARTIFACT_VERSIONING.md)"
+                        " · [research spine]"
+                        "(/Users/welcome/Documents/SoftwareEngineering/serendepify/akan-speech-lab/docs/ASR_RESEARCH_SPINE.md)"
+                    )
+
                 with gr.Tab("1 · Prepare"):
                     gr.Markdown("## Inspect one coherent sample pack\nEvery row below is one audio/reference pair. Choose a row to hear exactly the transcript shown beside it.")
                     with gr.Row():

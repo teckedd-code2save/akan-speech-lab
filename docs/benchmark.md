@@ -36,11 +36,12 @@ The checkpoint stores `generation_config.language=yoruba`. Clearing it and allow
 
 The current Whisper tokenizer averages `2.6015` tokens per reference word and `1.4345` non-space characters per token. This fragmentation is evidence for a later controlled tokenizer-extension experiment, not justification for replacing Whisper's vocabulary before a clean training baseline exists.
 
-## Promotion Rule
+## Evidence Rule
 
 A candidate must:
 
-1. Beat the frozen baseline on corpus WER.
+1. Report paired WER/CER against the frozen reference.
 2. Report CER, per-speaker WER, and duration-bucket WER.
 3. Pass manual Ghanaian review for orthography, code-switching, and meaning preservation.
 4. Avoid using benchmark v1 for gradient updates or checkpoint selection.
+5. Explain its training data mixture and why each corpus was included.

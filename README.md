@@ -1,6 +1,6 @@
 # Akan Speech Lab
 
-Reusable fine-tuning and evaluation infrastructure for Akan-language speech systems. ASR is frozen; research-grounded Asante Twi TTS is the active milestone.
+Reusable fine-tuning and evaluation infrastructure for Akan-language speech systems. The active ASR target is an expressive Akan recognizer: stronger word transcription plus punctuation, pause, emphasis, and stretch capture where the data supports it.
 
 The goal is commercial-grade speech infrastructure for domains such as health, ecommerce, customer support, family care, and local voice agents. This repo is intentionally separate from the hackathon app so experiments, datasets, checkpoints, and Modal jobs do not bloat product code.
 
@@ -13,8 +13,9 @@ The goal is commercial-grade speech infrastructure for domains such as health, e
    - MMS ASR variants
    - any strong public Whisper/Akan checkpoint we validate
 4. Publish the experimental Round 2 model with its failed-promotion limitations.
-5. Build SpeechT5 data, tokenizer, training, and human-evaluation gates for Asante Twi TTS.
-6. Run Modal only for durable gated jobs; one container maximum and scale-to-zero.
+5. Build ASR Milestone 1: correction capture, punctuation restoration, and expressive prosody tags.
+6. Build commercially usable Asante Twi TTS after ASR Milestone 1 has a clean feedback loop.
+7. Run Modal only for durable gated jobs; one container maximum and scale-to-zero.
 
 ## Repository Layout
 
@@ -75,11 +76,15 @@ The immediate baseline is `teckedd/whisper_small-waxal_akan-asr-v1`. On this rep
 
 The first evidence-driven continuation run improved the complete 1,123-row validation split from **32.69% to 31.45% WER** at step 300. Step 400 regressed to 31.83%. On all 1,522 held-out Waxal test rows, the selected checkpoint improves **33.84% to 32.77% WER** and **12.74% to 12.47% CER**. A 5,000-sample paired bootstrap gives 99.86% probability of improvement and a -1.90 to -0.33 point 95% WER-difference interval. The [experimental candidate](https://huggingface.co/teckedd/whisper-small-waxal-akan-continuation-v1) remains gated because two outputs entered severe repetition loops and Ghanaian listening review is pending.
 
-Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal test, compared with 34.32% for the original and 33.66% for the continuation under the same harness. It is published as [teckedd/whisper-small-waxal-round2-specaug-v1](https://huggingface.co/teckedd/whisper-small-waxal-round2-specaug-v1), but is explicitly experimental because one repetition collapse and the speaker-4430 regression failed the promotion gate. ASR training is closed while TTS is built.
+Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal test, compared with 34.32% for the original and 33.66% for the continuation under the same harness. It is published as [teckedd/whisper-small-waxal-round2-specaug-v1](https://huggingface.co/teckedd/whisper-small-waxal-round2-specaug-v1), but is explicitly experimental because one repetition collapse and the speaker-4430 regression failed the promotion gate. The next ASR milestone is not another blind run: it adds correction capture, punctuation restoration, and expressive tags while keeping WER evaluation separate.
 
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
+- [Artifact versioning](docs/ARTIFACT_VERSIONING.md)
+- [ASR pipeline loop](docs/ASR_PIPELINE_LOOP.md)
+- [ASR Milestone 1: Expressive Akan Recognition](docs/ASR_MILESTONE1_EXPRESSIVE.md)
+- [ASR research spine](docs/ASR_RESEARCH_SPINE.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)

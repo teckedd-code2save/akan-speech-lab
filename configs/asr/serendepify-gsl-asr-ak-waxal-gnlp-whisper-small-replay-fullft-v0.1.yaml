@@ -1,0 +1,52 @@
+code_name: serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-replay-fullft-v0.1
+hf_repo: teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-replay-fullft-v0.1
+status: planned
+task: asr
+language: ak
+base_model: openai/whisper-small
+starting_checkpoint: teckedd/whisper-small-waxal-round2-specaug-v1
+method: replay-fullft
+datasets:
+  - token: waxal
+    id: google/WaxalNLP
+    config: aka_asr
+    role: anchor corpus and regression replay
+  - token: gnlp
+    id: ghananlpcommunity/twi-speech-text-multispeaker-16k
+    role: Twi adaptation corpus after harmonization
+preprocessing:
+  preserve_raw_text: true
+  preserve_punctuated_text: true
+  wer_normalized_text: true
+  expressive_tags_field: true
+  required_audits:
+    - license_and_consent
+    - speaker_identity_availability
+    - duplicate_audio
+    - duplicate_text
+    - split_leakage
+    - duration_distribution
+    - silence_and_clipping
+    - akan_character_coverage
+    - spelling_variants
+    - code_switching
+training:
+  tuning_type: full_fine_tune
+  replay_mixing_required: true
+  lora: false
+  specaugment: candidate_after_manifest_audit
+evaluation:
+  report_by_corpus: true
+  report_by_duration: true
+  report_by_speaker_when_available: true
+  repetition_collapse_check: true
+  punctuation_f1_separate: true
+publication:
+  artifact_type: model
+  visibility: public_review_candidate
+  model_card_required: true
+  publish_only_after:
+    - manifest_hash_recorded
+    - heldout_metrics_recorded
+    - failure_taxonomy_recorded
+    - ghanaian_review_notes_recorded
