@@ -51,7 +51,7 @@ def execute_pipeline(*, stop_before_train: bool = False) -> dict:
         "pick": [PYTHON, "scripts/build_asr_review_packet.py"],
         "prepare": None,
         "sanitize": [PYTHON, "scripts/sanitize_asr_v01.py"],
-        "train": None,
+        "train": [PYTHON, "scripts/modal_asr_v01_jobs.py", "train"],
         "test": None,
         "save": None,
         "publish": None,
@@ -163,4 +163,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

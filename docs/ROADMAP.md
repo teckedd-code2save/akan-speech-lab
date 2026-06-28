@@ -136,6 +136,13 @@ path using Waxal as anchor/replay and GhanaNLP after harmonization. It is not
 published until manifest hashes, held-out metrics, failure taxonomy, and
 Ghanaian review notes exist.
 
+The v0.2 balanced full fine-tune was run and published only for traceability:
+`teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2`.
+It is not promoted because dev WER worsened from 44.32% to 52.46%. The lesson is
+that a 4,000-row mixed subset trained for 4.8 effective epochs overfits; the next
+ASR candidate must use broader coverage, fewer effective epochs, per-corpus WER,
+and early stop on first-regression evidence.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any

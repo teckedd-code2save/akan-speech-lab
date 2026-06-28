@@ -78,6 +78,8 @@ The first evidence-driven continuation run improved the complete 1,123-row valid
 
 Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal test, compared with 34.32% for the original and 33.66% for the continuation under the same harness. It is published as [teckedd/whisper-small-waxal-round2-specaug-v1](https://huggingface.co/teckedd/whisper-small-waxal-round2-specaug-v1), but is explicitly experimental because one repetition collapse and the speaker-4430 regression failed the promotion gate. The next ASR milestone is not another blind run: it adds correction capture, punctuation restoration, and expressive tags while keeping WER evaluation separate.
 
+The first broader Waxal+GhanaNLP training attempt, v0.2, is published for traceability at [teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2), but it is **not promoted**. It trained successfully, but worsened dev WER from **44.32% to 52.46%**, likely due to small-set overfitting across 4.8 effective epochs. See [ASR v0.2 Result](docs/ASR_V02_RESULT.md).
+
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
@@ -85,6 +87,7 @@ Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal tes
 - [ASR pipeline loop](docs/ASR_PIPELINE_LOOP.md)
 - [ASR Milestone 1: Expressive Akan Recognition](docs/ASR_MILESTONE1_EXPRESSIVE.md)
 - [ASR research spine](docs/ASR_RESEARCH_SPINE.md)
+- [ASR v0.2 result](docs/ASR_V02_RESULT.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)
