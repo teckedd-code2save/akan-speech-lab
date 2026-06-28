@@ -11,8 +11,8 @@ HOUR = 60 * 60
 CACHE_DIR = "/cache"
 OUTPUT_DIR = "/outputs"
 MANIFEST_PATH = Path("/manifests/v01.jsonl")
-APP_NAME = "akan-speech-asr-v02"
-CODE_NAME = "serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2"
+APP_NAME = "akan-speech-asr-v03"
+CODE_NAME = "serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-broad-lowlr-freezeenc-fullft-v0.3"
 SOURCE_MANIFEST_CODE = "serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-replay-fullft-v0.1"
 MODEL_REPO = f"teckedd/{CODE_NAME}"
 GNLP_TRAIN_PARQUET = (
@@ -60,8 +60,8 @@ class V01TrainConfig:
     base_model: str = "teckedd/whisper-small-waxal-round2-specaug-v1"
     model_repo: str = MODEL_REPO
     seed: int = 42
-    max_steps: int = 1200
-    learning_rate: float = 1e-5
+    max_steps: int = 800
+    learning_rate: float = 3e-6
     weight_decay: float = 0.01
     warmup_steps: int = 100
     train_batch_size: int = 8
@@ -70,9 +70,11 @@ class V01TrainConfig:
     eval_steps: int = 200
     save_steps: int = 200
     generation_max_length: int = 225
-    train_per_corpus: int = 2000
-    eval_per_corpus: int = 128
+    train_per_corpus: int = 6000
+    eval_per_corpus: int = 256
     apply_spec_augment: bool = True
+    freeze_encoder: bool = True
+    stop_on_first_regression: bool = True
 
 
 def normalize_akan_text(text: str) -> str:
@@ -119,7 +121,7 @@ def select_manifest_rows(config: V01TrainConfig) -> tuple[list[dict], list[dict]
         train.extend(corpus_train)
         dev.extend(corpus_dev)
     if not train or not dev:
-        raise RuntimeError("v0.2 train/dev row selection is empty")
+        raise RuntimeError("v0.3 train/dev row selection is empty")
     return train, dev
 
 
@@ -222,6 +224,7 @@ def train_and_publish(config_dict: dict) -> dict:
     from huggingface_hub import HfApi
     from jiwer import wer
     from transformers import (
+        EarlyStoppingCallback,
         Seq2SeqTrainer,
         Seq2SeqTrainingArguments,
         TrainerCallback,
@@ -242,10 +245,17 @@ def train_and_publish(config_dict: dict) -> dict:
 
     set_seed(config.seed)
     train_rows, dev_rows = select_manifest_rows(config)
+    dev_materialized = materialize_rows(dev_rows)
     raw = DatasetDict(
         {
             "train": Dataset.from_list(materialize_rows(train_rows)),
-            "dev": Dataset.from_list(materialize_rows(dev_rows)),
+            "dev": Dataset.from_list(dev_materialized),
+            "dev_waxal": Dataset.from_list(
+                [row for row in dev_materialized if row["corpus"] == "waxal"]
+            ),
+            "dev_gnlp": Dataset.from_list(
+                [row for row in dev_materialized if row["corpus"] == "gnlp"]
+            ),
         }
     )
     feature_extractor = WhisperFeatureExtractor.from_pretrained(
@@ -278,6 +288,8 @@ def train_and_publish(config_dict: dict) -> dict:
 
     dataset = raw.map(prepare, remove_columns=["audio"])
     model = WhisperForConditionalGeneration.from_pretrained(config.base_model)
+    if config.freeze_encoder:
+        model.freeze_encoder()
     model.config.forced_decoder_ids = None
     model.generation_config.forced_decoder_ids = None
     model.generation_config.language = None
@@ -313,6 +325,23 @@ def train_and_publish(config_dict: dict) -> dict:
     class CommitCheckpointCallback(TrainerCallback):
         def on_save(self, args, state, control, **kwargs):
             output_volume.commit()
+            return control
+
+    stop_state = {"baseline_wer": None, "stopped_on_regression": False}
+
+    class BaselineRegressionStopCallback(TrainerCallback):
+        def on_evaluate(self, args, state, control, metrics=None, **kwargs):
+            baseline_wer = stop_state.get("baseline_wer")
+            eval_wer = (metrics or {}).get("eval_wer")
+            if (
+                config.stop_on_first_regression
+                and baseline_wer is not None
+                and eval_wer is not None
+                and state.global_step >= config.eval_steps
+                and eval_wer > baseline_wer
+            ):
+                stop_state["stopped_on_regression"] = True
+                control.should_training_stop = True
             return control
 
     training_args = Seq2SeqTrainingArguments(
@@ -355,15 +384,40 @@ def train_and_publish(config_dict: dict) -> dict:
         processing_class=feature_extractor,
         data_collator=collator,
         compute_metrics=compute_metrics,
-        callbacks=[CommitCheckpointCallback()],
+        callbacks=[
+            CommitCheckpointCallback(),
+            EarlyStoppingCallback(early_stopping_patience=2),
+            BaselineRegressionStopCallback(),
+        ],
     )
     baseline_metrics = trainer.evaluate(metric_key_prefix="baseline")
+    baseline_by_corpus = {
+        "waxal": trainer.evaluate(
+            eval_dataset=dataset["dev_waxal"],
+            metric_key_prefix="baseline_waxal",
+        ),
+        "gnlp": trainer.evaluate(
+            eval_dataset=dataset["dev_gnlp"],
+            metric_key_prefix="baseline_gnlp",
+        ),
+    }
+    stop_state["baseline_wer"] = baseline_metrics["baseline_wer"]
     trainer.save_metrics("baseline", baseline_metrics)
     train_result = trainer.train()
     trainer.save_model(str(run_dir / "final"))
     processor.save_pretrained(str(run_dir / "final"))
     trainer.save_metrics("train", train_result.metrics)
     final_metrics = trainer.evaluate(metric_key_prefix="final")
+    final_by_corpus = {
+        "waxal": trainer.evaluate(
+            eval_dataset=dataset["dev_waxal"],
+            metric_key_prefix="final_waxal",
+        ),
+        "gnlp": trainer.evaluate(
+            eval_dataset=dataset["dev_gnlp"],
+            metric_key_prefix="final_gnlp",
+        ),
+    }
     trainer.save_metrics("final", final_metrics)
     trainer.save_state()
 
@@ -375,9 +429,12 @@ def train_and_publish(config_dict: dict) -> dict:
         "run_dir": str(run_dir),
         "rows": {"train": len(dataset["train"]), "dev": len(dataset["dev"])},
         "baseline_metrics": baseline_metrics,
+        "baseline_by_corpus": baseline_by_corpus,
         "train_metrics": train_result.metrics,
         "final_metrics": final_metrics,
+        "final_by_corpus": final_by_corpus,
         "best_checkpoint": trainer.state.best_model_checkpoint,
+        "stopped_on_regression": stop_state["stopped_on_regression"],
         "cuda": torch.cuda.get_device_name(0),
     }
     summary_path.write_text(json.dumps(summary, indent=2, default=str) + "\n")
@@ -404,8 +461,8 @@ library_name: transformers
 
 # {config.run_name}
 
-This is the second Ghanaian Speech Lab ASR artifact: a balanced Waxal+GhanaNLP
-full fine-tuning pass intended to improve WER beyond the Round 2 checkpoint.
+This is the third Ghanaian Speech Lab ASR artifact: a broader Waxal+GhanaNLP
+low-learning-rate full fine-tuning pass with the Whisper encoder frozen.
 
 It is a real training run, not a smoke-test checkpoint, but it is still a
 review candidate until the held-out evaluation and failure taxonomy are complete.
@@ -416,7 +473,9 @@ License is set conservatively because this pass includes Waxal-derived data.
 - Dev rows: {len(dataset["dev"])}
 - Max steps: {config.max_steps}
 - Method: full fine-tuning from `{config.base_model}`
-- Dataset mix: balanced Waxal + GhanaNLP from the v0.1 sanitized manifest
+- Dataset mix: broad Waxal + GhanaNLP from the v0.1 sanitized manifest
+- Frozen encoder: {config.freeze_encoder}
+- Stop on first regression: {config.stop_on_first_regression}
 
 Baseline metrics:
 
@@ -424,10 +483,22 @@ Baseline metrics:
 {json.dumps(baseline_metrics, indent=2, ensure_ascii=False)}
 ```
 
+Baseline by corpus:
+
+```json
+{json.dumps(baseline_by_corpus, indent=2, ensure_ascii=False)}
+```
+
 Final metrics:
 
 ```json
 {json.dumps(final_metrics, indent=2, ensure_ascii=False)}
+```
+
+Final by corpus:
+
+```json
+{json.dumps(final_by_corpus, indent=2, ensure_ascii=False)}
 ```
 """,
         encoding="utf-8",
@@ -439,7 +510,7 @@ Final metrics:
         repo_id=config.model_repo,
         repo_type="model",
         folder_path=str(run_dir / "final"),
-        commit_message="Publish balanced GSL ASR v0.2 checkpoint",
+        commit_message="Publish broad low-LR GSL ASR v0.3 checkpoint",
         ignore_patterns=["training_args.bin"],
     )
     info = api.model_info(config.model_repo, files_metadata=True)
