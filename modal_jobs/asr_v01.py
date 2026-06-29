@@ -156,11 +156,18 @@ def load_source_dataset(corpus: str, split: str):
 def materialize_rows(records: list[dict]) -> list[dict]:
     loaded = {}
     materialized = []
-    for record in records:
+    ordered_records = sorted(
+        records,
+        key=lambda row: (row["corpus"], source_split_key(row), int(row["dataset_row"])),
+    )
+    total = len(ordered_records)
+    print(f"Materializing {total} audio rows", flush=True)
+    for index, record in enumerate(ordered_records, start=1):
         corpus = record["corpus"]
         split = source_split_key(record)
         key = (corpus, split)
         if key not in loaded:
+            print(f"Loading source dataset {corpus}/{split}", flush=True)
             loaded[key] = load_source_dataset(corpus, split)
         source = loaded[key][int(record["dataset_row"])]
         audio = source["audio"]
@@ -176,6 +183,8 @@ def materialize_rows(records: list[dict]) -> list[dict]:
                 "audio": audio,
             }
         )
+        if index == 1 or index % 500 == 0 or index == total:
+            print(f"Materialized {index}/{total} audio rows", flush=True)
     return materialized
 
 
@@ -287,6 +296,7 @@ def train_and_publish(config_dict: dict) -> dict:
         }
 
     dataset = raw.map(prepare, remove_columns=["audio"])
+    dataset["train"] = dataset["train"].shuffle(seed=config.seed)
     model = WhisperForConditionalGeneration.from_pretrained(config.base_model)
     if config.freeze_encoder:
         model.freeze_encoder()
