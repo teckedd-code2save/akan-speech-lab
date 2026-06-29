@@ -15,6 +15,30 @@ APP_NAME = "akan-speech-asr-v04-waxal"
 CODE_NAME = "serendepify-gsl-asr-ak-waxal-whisper-small-only-lowlr-freezeenc-fullft-v0.4"
 SOURCE_MANIFEST_CODE = "serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-replay-fullft-v0.1"
 MODEL_REPO = f"teckedd/{CODE_NAME}"
+WAXAL_PARQUET = {
+    "train": (
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0000.parquet",
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0001.parquet",
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0002.parquet",
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0003.parquet",
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0004.parquet",
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/train/0005.parquet",
+    ),
+    "validation": (
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/validation/0000.parquet",
+    ),
+    "test": (
+        "https://huggingface.co/datasets/google/WaxalNLP/resolve/refs%2Fconvert%2Fparquet/"
+        "aka_asr/test/0000.parquet",
+    ),
+}
 
 app = modal.App(APP_NAME)
 cache_volume = modal.Volume.from_name("akan-speech-hf-cache", create_if_missing=True)
@@ -109,8 +133,8 @@ def load_source_dataset(corpus: str, split: str):
 
     if corpus == "waxal":
         return load_dataset(
-            "google/WaxalNLP",
-            "aka_asr",
+            "parquet",
+            data_files={split: list(WAXAL_PARQUET[split])},
             split=split,
             cache_dir=CACHE_DIR,
         ).cast_column("audio", Audio(sampling_rate=16000))
