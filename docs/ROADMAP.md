@@ -151,6 +151,15 @@ only from 45.44% to 45.18%, Waxal regressed from 34.54% to 35.84%, and GhanaNLP
 remained unusable at 96.92% WER. See [ASR v0.3 result](ASR_V03_RESULT.md).
 This closes broad raw Waxal+GhanaNLP full fine-tuning as a near-term path.
 
+The v0.4 Waxal-only low-learning-rate frozen-encoder run was also completed and
+published only for traceability:
+`teckedd/serendepify-gsl-asr-ak-waxal-whisper-small-only-lowlr-freezeenc-fullft-v0.4`.
+It trained only on 9,138 Waxal rows and evaluated on a 1,024-row Waxal dev slice.
+The base Round 2 checkpoint scored 31.88% WER on that slice; v0.4 regressed to
+34.09% WER at checkpoint 200, so the regression gate stopped the run. See
+[ASR v0.4 result](ASR_V04_RESULT.md). This closes blind Waxal-only continuation
+as a near-term path too.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any
