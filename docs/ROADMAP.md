@@ -143,6 +143,14 @@ that a 4,000-row mixed subset trained for 4.8 effective epochs overfits; the nex
 ASR candidate must use broader coverage, fewer effective epochs, per-corpus WER,
 and early stop on first-regression evidence.
 
+The v0.3 broader low-learning-rate frozen-encoder retry was also run and
+published only for traceability:
+`teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-broad-lowlr-freezeenc-fullft-v0.3`.
+It stopped through the regression path after checkpoint 200. Mixed dev WER moved
+only from 45.44% to 45.18%, Waxal regressed from 34.54% to 35.84%, and GhanaNLP
+remained unusable at 96.92% WER. See [ASR v0.3 result](ASR_V03_RESULT.md).
+This closes broad raw Waxal+GhanaNLP full fine-tuning as a near-term path.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any

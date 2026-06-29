@@ -80,6 +80,8 @@ Round 2 reached **32.84% WER / 11.79% CER** on the immutable 1,522-row Waxal tes
 
 The first broader Waxal+GhanaNLP training attempt, v0.2, is published for traceability at [teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-balanced-fullft-v0.2), but it is **not promoted**. It trained successfully, but worsened dev WER from **44.32% to 52.46%**, likely due to small-set overfitting across 4.8 effective epochs. See [ASR v0.2 Result](docs/ASR_V02_RESULT.md).
 
+The v0.3 broader low-learning-rate frozen-encoder retry is published for traceability at [teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-broad-lowlr-freezeenc-fullft-v0.3](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-waxal-gnlp-whisper-small-broad-lowlr-freezeenc-fullft-v0.3), but it is **not promoted**. It barely moved mixed dev WER from **45.44% to 45.18%**, regressed Waxal from **34.54% to 35.84%**, and left GhanaNLP unusable at **96.92% WER**. See [ASR v0.3 Result](docs/ASR_V03_RESULT.md).
+
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
@@ -88,6 +90,7 @@ The first broader Waxal+GhanaNLP training attempt, v0.2, is published for tracea
 - [ASR Milestone 1: Expressive Akan Recognition](docs/ASR_MILESTONE1_EXPRESSIVE.md)
 - [ASR research spine](docs/ASR_RESEARCH_SPINE.md)
 - [ASR v0.2 result](docs/ASR_V02_RESULT.md)
+- [ASR v0.3 result](docs/ASR_V03_RESULT.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)
