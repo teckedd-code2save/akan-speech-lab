@@ -86,6 +86,8 @@ The v0.4 Waxal-only low-learning-rate frozen-encoder run is published for tracea
 
 The v0.5 GhanaNLP-only diagnostic is published for traceability at [teckedd/serendepify-gsl-asr-ak-gnlp-whisper-small-only-lowlr-freezeenc-fullft-v0.5](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-gnlp-whisper-small-only-lowlr-freezeenc-fullft-v0.5), but it is **not promoted**. It improved GhanaNLP validation WER from **113.97% to 87.55%**, proving the dataset has learnable signal, but it remains far from usable and regressed Waxal from **32.59% to 35.75%** on the regression slice. See [ASR v0.5 Result](docs/ASR_V05_RESULT.md).
 
+The follow-up GhanaNLP manifest audit keeps **6,704 / 11,830** rows as first-pass clean candidates and identifies **3,088** too-short clips, **2,162** suspicious word/audio-speed rows, and **2,038** duplicate-transcript rows. GhanaNLP should now be used as cleaned adaptation data with Waxal replay, not as raw single-corpus fine-tuning. See [GhanaNLP manifest audit v0.5](docs/GNLP_MANIFEST_AUDIT_V05.md).
+
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
@@ -97,6 +99,7 @@ The v0.5 GhanaNLP-only diagnostic is published for traceability at [teckedd/sere
 - [ASR v0.3 result](docs/ASR_V03_RESULT.md)
 - [ASR v0.4 result](docs/ASR_V04_RESULT.md)
 - [ASR v0.5 result](docs/ASR_V05_RESULT.md)
+- [GhanaNLP manifest audit v0.5](docs/GNLP_MANIFEST_AUDIT_V05.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)

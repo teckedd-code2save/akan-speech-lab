@@ -169,6 +169,13 @@ Waxal regression slice from 32.59% to 35.75%. See
 [ASR v0.5 result](ASR_V05_RESULT.md). The next GhanaNLP step is row-level audit
 and cleaned-subset construction, not another blind full fine-tune.
 
+The first GhanaNLP row-level manifest audit is complete. It keeps 6,704 of
+11,830 rows as first-pass clean candidates, while flagging 3,088 too-short
+clips, 2,162 suspicious word/audio-speed rows, and 2,038 duplicate-transcript
+rows. See [GhanaNLP manifest audit v0.5](GNLP_MANIFEST_AUDIT_V05.md). The next
+trainable recipe is cleaned GhanaNLP adaptation with Waxal replay, not raw
+GhanaNLP-only training.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any
@@ -186,12 +193,14 @@ from normalized WER. They cannot be used to claim a better ASR word model.
 
 Immediate next implementation:
 
-1. Add correction capture and export.
-2. Add punctuation-preserving transcript fields alongside WER-normalized fields.
-3. Add expressive tag schema and manual annotation controls.
-4. Build a corpus-audit table for Waxal, GhanaNLP, and supplemental datasets.
-5. Train a small punctuation restoration baseline before another GPU ASR run.
-6. Run replay-mixed Whisper continuation only after the manifest explains the
+1. Build the v0.6 cleaned-GhanaNLP plus Waxal-replay manifest from the audit
+   outputs.
+2. Add correction capture and export.
+3. Add punctuation-preserving transcript fields alongside WER-normalized fields.
+4. Add expressive tag schema and manual annotation controls.
+5. Build a corpus-audit table for Waxal, GhanaNLP, and supplemental datasets.
+6. Train a small punctuation restoration baseline before another GPU ASR run.
+7. Run replay-mixed Whisper continuation only after the manifest explains the
    data mixture and regression gates.
 
 ## TTS Roadmap
@@ -234,6 +243,7 @@ Whisper Medium LoRA trained 4.72M adapter parameters for 200 steps but reached 4
 - GhanaNLP metadata prep: `scripts/prepare_ghana_nlp.py`
 - Frozen/evaluation reports: `evals/reports/` (large JSON files are gitignored)
 - Downloaded Modal summaries: `outputs/modal/` (gitignored)
+- GhanaNLP audit script: `scripts/audit_gnlp_manifest.py`
 - Data policy: `docs/datasets.md`
 - Evaluation policy: `docs/evaluation.md`
 - Training record: `docs/training.md`
