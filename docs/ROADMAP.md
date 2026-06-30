@@ -160,6 +160,15 @@ The base Round 2 checkpoint scored 31.88% WER on that slice; v0.4 regressed to
 [ASR v0.4 result](ASR_V04_RESULT.md). This closes blind Waxal-only continuation
 as a near-term path too.
 
+The v0.5 GhanaNLP-only diagnostic was completed and published only for
+traceability:
+`teckedd/serendepify-gsl-asr-ak-gnlp-whisper-small-only-lowlr-freezeenc-fullft-v0.5`.
+It improved GhanaNLP validation WER from 113.97% to 87.55%, which shows the
+dataset contains learnable signal. It is still not usable, and it regressed the
+Waxal regression slice from 32.59% to 35.75%. See
+[ASR v0.5 result](ASR_V05_RESULT.md). The next GhanaNLP step is row-level audit
+and cleaned-subset construction, not another blind full fine-tune.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any

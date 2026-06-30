@@ -84,6 +84,8 @@ The v0.3 broader low-learning-rate frozen-encoder retry is published for traceab
 
 The v0.4 Waxal-only low-learning-rate frozen-encoder run is published for traceability at [teckedd/serendepify-gsl-asr-ak-waxal-whisper-small-only-lowlr-freezeenc-fullft-v0.4](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-waxal-whisper-small-only-lowlr-freezeenc-fullft-v0.4), but it is **not promoted**. On its 1,024-row Waxal dev slice, the base Round 2 model scored **31.88% WER** and the v0.4 checkpoint regressed to **34.09% WER**, so the regression gate stopped the run at checkpoint 200. See [ASR v0.4 Result](docs/ASR_V04_RESULT.md).
 
+The v0.5 GhanaNLP-only diagnostic is published for traceability at [teckedd/serendepify-gsl-asr-ak-gnlp-whisper-small-only-lowlr-freezeenc-fullft-v0.5](https://huggingface.co/teckedd/serendepify-gsl-asr-ak-gnlp-whisper-small-only-lowlr-freezeenc-fullft-v0.5), but it is **not promoted**. It improved GhanaNLP validation WER from **113.97% to 87.55%**, proving the dataset has learnable signal, but it remains far from usable and regressed Waxal from **32.59% to 35.75%** on the regression slice. See [ASR v0.5 Result](docs/ASR_V05_RESULT.md).
+
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
@@ -94,6 +96,7 @@ The v0.4 Waxal-only low-learning-rate frozen-encoder run is published for tracea
 - [ASR v0.2 result](docs/ASR_V02_RESULT.md)
 - [ASR v0.3 result](docs/ASR_V03_RESULT.md)
 - [ASR v0.4 result](docs/ASR_V04_RESULT.md)
+- [ASR v0.5 result](docs/ASR_V05_RESULT.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)
