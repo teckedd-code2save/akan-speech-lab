@@ -88,6 +88,8 @@ The v0.5 GhanaNLP-only diagnostic is published for traceability at [teckedd/sere
 
 The follow-up GhanaNLP manifest audit keeps **6,704 / 11,830** rows as first-pass clean candidates and identifies **3,088** too-short clips, **2,162** suspicious word/audio-speed rows, and **2,038** duplicate-transcript rows. GhanaNLP should now be used as cleaned adaptation data with Waxal replay, not as raw single-corpus fine-tuning. See [GhanaNLP manifest audit v0.5](docs/GNLP_MANIFEST_AUDIT_V05.md).
 
+The next planned trainable input is v0.6: `serendepify-gsl-asr-ak-waxal-gnlpclean-whisper-small-replay-fullft-v0.6`. It uses Waxal as replay/regression evidence, only clean-candidate GhanaNLP rows for adaptation, and excludes GhanaNLP test rows from the manifest. See [ASR v0.6 manifest plan](docs/ASR_V06_MANIFEST.md).
+
 ## Key Docs
 
 - [Roadmap and handoff](docs/ROADMAP.md)
@@ -100,6 +102,7 @@ The follow-up GhanaNLP manifest audit keeps **6,704 / 11,830** rows as first-pas
 - [ASR v0.4 result](docs/ASR_V04_RESULT.md)
 - [ASR v0.5 result](docs/ASR_V05_RESULT.md)
 - [GhanaNLP manifest audit v0.5](docs/GNLP_MANIFEST_AUDIT_V05.md)
+- [ASR v0.6 manifest plan](docs/ASR_V06_MANIFEST.md)
 - [Asante Twi TTS research and execution record](docs/TTS_RESEARCH_AND_EXECUTION.md)
 - [Contamination-safe ASR Round 2 specification](docs/ASR_ROUND2_SPEC.md)
 - [Dataset plan](docs/datasets.md)

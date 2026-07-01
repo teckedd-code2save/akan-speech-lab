@@ -176,6 +176,13 @@ rows. See [GhanaNLP manifest audit v0.5](GNLP_MANIFEST_AUDIT_V05.md). The next
 trainable recipe is cleaned GhanaNLP adaptation with Waxal replay, not raw
 GhanaNLP-only training.
 
+The v0.6 manifest builder is implemented as
+`scripts/build_asr_v06_manifest.py`. It retargets the parent v0.1 manifest to
+`serendepify-gsl-asr-ak-waxal-gnlpclean-whisper-small-replay-fullft-v0.6`,
+keeps Waxal train/dev/test as replay and regression evidence, keeps only
+clean-candidate GhanaNLP train/validation rows, and excludes GhanaNLP test rows.
+See [ASR v0.6 manifest plan](ASR_V06_MANIFEST.md).
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any
@@ -193,14 +200,16 @@ from normalized WER. They cannot be used to claim a better ASR word model.
 
 Immediate next implementation:
 
-1. Build the v0.6 cleaned-GhanaNLP plus Waxal-replay manifest from the audit
-   outputs.
-2. Add correction capture and export.
-3. Add punctuation-preserving transcript fields alongside WER-normalized fields.
-4. Add expressive tag schema and manual annotation controls.
-5. Build a corpus-audit table for Waxal, GhanaNLP, and supplemental datasets.
-6. Train a small punctuation restoration baseline before another GPU ASR run.
-7. Run replay-mixed Whisper continuation only after the manifest explains the
+1. Inspect the generated v0.6 manifest report and confirm the train/eval row
+   counts before any GPU job.
+2. Implement the v0.6 Modal training executor with per-corpus WER and Waxal
+   regression stop.
+3. Add correction capture and export.
+4. Add punctuation-preserving transcript fields alongside WER-normalized fields.
+5. Add expressive tag schema and manual annotation controls.
+6. Build a corpus-audit table for Waxal, GhanaNLP, and supplemental datasets.
+7. Train a small punctuation restoration baseline before another GPU ASR run.
+8. Run replay-mixed Whisper continuation only after the manifest explains the
    data mixture and regression gates.
 
 ## TTS Roadmap
