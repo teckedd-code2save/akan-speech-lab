@@ -76,3 +76,50 @@ Never train on:
 
 The next Modal job should stop on Waxal regression or repetition collapse and
 should report per-corpus WER separately.
+
+## Modal Executor
+
+Executor:
+
+```text
+modal_jobs/asr_v06_clean_replay.py
+```
+
+Durable controller:
+
+```text
+scripts/modal_asr_v06_clean_replay_jobs.py
+```
+
+Cost-safe order:
+
+```bash
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py status
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py deploy
+```
+
+Only submit training after confirming the manifest report and Modal deployment:
+
+```bash
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py train
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py status
+```
+
+Cancel if needed:
+
+```bash
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py cancel
+```
+
+Default training controls:
+
+- Base: `teckedd/whisper-small-waxal-round2-specaug-v1`
+- Max steps: 1,200
+- Learning rate: `2e-6`
+- Effective batch size: 16
+- Encoder frozen: yes
+- SpecAugment: yes
+- Eval every 200 steps
+- Early stop on first Waxal validation regression
+- Publish target:
+  `teckedd/serendepify-gsl-asr-ak-waxal-gnlpclean-whisper-small-replay-fullft-v0.6`

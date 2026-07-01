@@ -183,6 +183,16 @@ keeps Waxal train/dev/test as replay and regression evidence, keeps only
 clean-candidate GhanaNLP train/validation rows, and excludes GhanaNLP test rows.
 See [ASR v0.6 manifest plan](ASR_V06_MANIFEST.md).
 
+The v0.6 Modal executor and durable controller are implemented but not submitted:
+
+```bash
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py deploy
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py train
+.venv/bin/python scripts/modal_asr_v06_clean_replay_jobs.py status
+```
+
+Submit only after explicitly choosing to spend GPU time.
+
 This milestone targets the user-facing gaps that WER alone did not solve:
 
 1. a stronger corpus recipe, with Waxal, GhanaNLP, correction data, and any
@@ -200,10 +210,8 @@ from normalized WER. They cannot be used to claim a better ASR word model.
 
 Immediate next implementation:
 
-1. Inspect the generated v0.6 manifest report and confirm the train/eval row
-   counts before any GPU job.
-2. Implement the v0.6 Modal training executor with per-corpus WER and Waxal
-   regression stop.
+1. Decide whether to deploy and submit the v0.6 Modal training job.
+2. Monitor the durable v0.6 call without duplicating it.
 3. Add correction capture and export.
 4. Add punctuation-preserving transcript fields alongside WER-normalized fields.
 5. Add expressive tag schema and manual annotation controls.
